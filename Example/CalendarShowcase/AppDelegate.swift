@@ -77,6 +77,12 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
         title = scenario.title
     }
     required init?(coder: NSCoder) { fatalError("Use init(scenario:implementation:)") }
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+        if scenario == .largeText {
+            parent?.setOverrideTraitCollection(UITraitCollection(preferredContentSizeCategory: .accessibilityMedium), forChild: self)
+        }
+    }
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemGroupedBackground
@@ -90,14 +96,34 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
         stack.axis = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+        let scroll = UIScrollView()
+        if scenario == .largeText {
+            scroll.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(scroll); scroll.addSubview(stack)
+            NSLayoutConstraint.activate([
+                scroll.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+                scroll.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+                scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                scroll.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+                stack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 12),
+                stack.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -12),
+                stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 8),
+                stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -8),
+                stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -24),
+                table.heightAnchor.constraint(equalToConstant: 200)
+            ])
+        } else {
+            view.addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+                stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+                stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+                stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            ])
+        }
         heightConstraint = driver.view.heightAnchor.constraint(equalToConstant: scenario == .week ? 120 : (scenario == .continuous ? 400 : 320))
         heightConstraint.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
-            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             controls.heightAnchor.constraint(equalToConstant: 42), heightConstraint,
             table.heightAnchor.constraint(greaterThanOrEqualToConstant: 30)
         ])
@@ -128,9 +154,17 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
     override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); updateState() }
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        pageLabel.accessibilityValue = view.bounds.width > view.bounds.height ? "landscape" : "portrait"
         if !didPresentFixture {
             didPresentFixture = true
             driver.reset()
+        }
+    }
+    override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        pageLabel.accessibilityValue = "rotating"
+        coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+            self?.pageLabel.accessibilityValue = size.width > size.height ? "landscape" : "portrait"
         }
     }
     private func button(_ title: String, action: Selector) -> UIButton {

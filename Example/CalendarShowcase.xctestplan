@@ -3,7 +3,26 @@
     {
       "id": "DC72825C-8F40-4676-AF7B-963D9213993C",
       "name": "Legacy baseline",
-      "options": {}
+      "options": {
+        "environmentVariableEntries": [
+          {
+            "key": "FSCALENDAR_IMPLEMENTATION",
+            "value": "legacy"
+          }
+        ]
+      }
+    },
+    {
+      "id": "C78C6D01-8479-4B6E-AB83-41FBA5CD4381",
+      "name": "Swift rewrite",
+      "options": {
+        "environmentVariableEntries": [
+          {
+            "key": "FSCALENDAR_IMPLEMENTATION",
+            "value": "swift"
+          }
+        ]
+      }
     }
   ],
   "defaultOptions": {

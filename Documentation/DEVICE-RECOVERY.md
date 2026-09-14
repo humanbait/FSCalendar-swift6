@@ -22,12 +22,12 @@ XCTDHarnessSession._IDE_deleteAttachments(with:)
 
 This report predates the current run. It identifies an XCTest attachment-cleanup failure consistent with the observed disconnections, but it does not by itself prove the cause of every stalled session.
 
-## Test-plan change under validation
+## Earlier retention-only attempt
 
 `Example/CalendarShowcase.xctestplan` retains both UI testing screenshots and custom attachments. This preserves test evidence and aims to avoid the identified cleanup path. The generated `.xctestrun` has been checked: `SystemAttachmentLifetime` and `UserAttachmentLifetime` are both `keepAlways` for the hosted and UI test targets. Assertions, enabled cases, and calendar behavior are unchanged by this setting.
 
-A fresh device connection and complete physical-device run are required to verify this workaround. The Swift rewrite remains behind the agreed baseline gate.
+At this stage of the investigation, a complete physical-device pass was still required and the Swift rewrite had not started. The later matrix run described above passed that gate.
 
 The first retention-enabled retry (`baseline-retained-*`) still stalled before executing any test, despite CoreDevice reporting a fresh tunnel connection. It therefore cannot validate the attachment-cleanup workaround. The phone was unlocked with no authorization prompt. The stalled run was stopped; further device-service recovery is required.
 
-Raw evidence is in ignored `artifacts/baseline-reconnected-20260914T131256174889Z`, `artifacts/baseline-full-*`, and `artifacts/baseline-service-restart-*`. The reconnect run passed; the full runs have not passed.
+Raw evidence is in ignored `artifacts/baseline-reconnected-20260914T131256174889Z`, `artifacts/baseline-full-*`, and `artifacts/baseline-service-restart-*`. These earlier full attempts failed; the later baseline matrix succeeded.

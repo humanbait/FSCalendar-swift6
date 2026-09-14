@@ -1,9 +1,10 @@
 import XCTest
 
 final class CalendarShowcaseUITests: XCTestCase {
+    private var implementation: String { ProcessInfo.processInfo.environment["FSCALENDAR_IMPLEMENTATION"] ?? "legacy" }
     // Xcode 27's device runner can disconnect during inter-test attachment cleanup on iOS 17.
     // Keep the unchanged scenario assertions in one test, with individually named result activities.
-    @MainActor func testLegacyScenarioMatrix() {
+    @MainActor func testSharedScenarioMatrix() throws {
         XCTContext.runActivity(named: "TapAndReset") { _ in exerciseTapAndReset() }
         XCTContext.runActivity(named: "PagingAndSelectionPersistence") { _ in exercisePagingAndSelectionPersistence() }
         XCTContext.runActivity(named: "ScopeChangesAndRotation") { _ in exerciseScopeChangesAndRotation() }
@@ -15,8 +16,16 @@ final class CalendarShowcaseUITests: XCTestCase {
         XCTContext.runActivity(named: "BoundsRejectDisabledDay") { _ in exerciseBoundsRejectDisabledDay() }
         XCTContext.runActivity(named: "AppearanceScenarios") { _ in exerciseAppearanceScenarios() }
         XCTContext.runActivity(named: "LaunchPerformance") { _ in exerciseLaunchPerformance() }
+        XCTContext.runActivity(named: "WeekPaging") { _ in exerciseWeekPaging() }
+        XCTContext.runActivity(named: "DynamicHeight") { _ in exerciseDynamicHeight() }
+        try XCTContext.runActivity(named: "AccessibilityDescriptions") { _ in
+            let app = launch("content")
+            if #available(iOS 17.0, *) {
+                try app.performAccessibilityAudit(for: .sufficientElementDescription)
+            }
+        }
     }
-    @MainActor private func launch(_ scenario: String, implementation: String = "legacy") -> XCUIApplication {
+    @MainActor private func launch(_ scenario: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--scenario", scenario, "--implementation", implementation]
         app.launch()
@@ -36,6 +45,7 @@ final class CalendarShowcaseUITests: XCTestCase {
         XCTAssertTrue(cell.waitForExistence(timeout: 5))
         cell.tap()
         wait(app.staticTexts["selection-state"], contains: "2024-02-14")
+        wait(app.staticTexts["event-state"], contains: "2024-02-14")
         app.buttons["reset"].tap()
         wait(app.staticTexts["selection-state"], contains: "none")
     }
@@ -50,15 +60,25 @@ final class CalendarShowcaseUITests: XCTestCase {
     }
     @MainActor private func exerciseScopeChangesAndRotation() {
         let app = launch("scope")
-        app.buttons["scope"].tap()
-        wait(app.staticTexts["page-state"], contains: "week")
-        app.buttons["scope"].tap()
-        wait(app.staticTexts["page-state"], contains: "month")
+        let started = Date.timeIntervalSinceReferenceDate
+        for _ in 0..<3 {
+            app.buttons["scope"].tap()
+            wait(app.staticTexts["page-state"], contains: "week")
+            app.buttons["scope"].tap()
+            wait(app.staticTexts["page-state"], contains: "month")
+        }
+        recordDuration("three-mode-round-trips", since: started)
         XCUIDevice.shared.orientation = .landscapeLeft
+        waitForOrientation("landscape", in: app)
         XCTAssertTrue(app.buttons["next"].exists)
         XCUIDevice.shared.orientation = .portrait
+        waitForOrientation("portrait", in: app)
         app.buttons["next"].tap()
         wait(app.staticTexts["page-state"], contains: "2024-03")
+    }
+    @MainActor private func waitForOrientation(_ orientation: String, in app: XCUIApplication) {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", orientation), object: app.staticTexts["page-state"])
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
     }
     @MainActor private func exerciseMultipleSelectionAndCustomCells() {
         let app = launch("range")
@@ -66,7 +86,7 @@ final class CalendarShowcaseUITests: XCTestCase {
         day(app, "2024-02-14").tap()
         wait(app.staticTexts["selection-state"], contains: "2024-02-13")
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "legacy-range"
+        shot.name = "\(implementation)-range"
         shot.lifetime = .keepAlways
         add(shot)
     }
@@ -81,9 +101,11 @@ final class CalendarShowcaseUITests: XCTestCase {
         let app = launch("continuous")
         wait(app.staticTexts["page-state"], contains: "2024-02")
         let before = app.staticTexts["page-state"].label
+        let started = Date.timeIntervalSinceReferenceDate
         app.collectionViews["calendar-grid"].swipeUp()
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", before), object: app.staticTexts["page-state"])
         XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed)
+        recordDuration("continuous-swipe-and-settle", since: started)
     }
     @MainActor private func exerciseVerticalPaging() {
         let app = launch("vertical")
@@ -109,14 +131,43 @@ final class CalendarShowcaseUITests: XCTestCase {
             let app = launch(scenario)
             XCTAssertTrue(day(app, "2024-02-14").exists, scenario)
             let attachment = XCTAttachment(screenshot: app.screenshot())
-            attachment.name = "legacy-\(scenario)"
+            attachment.name = "\(implementation)-\(scenario)"
             attachment.lifetime = .keepAlways
             add(attachment)
         }
     }
     @MainActor private func exerciseLaunchPerformance() {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let app = XCUIApplication()
+            app.launchArguments = ["--implementation", implementation, "--scenario", "month"]
+            app.launch()
         }
+    }
+    @MainActor private func exerciseWeekPaging() {
+        let app = launch("week")
+        wait(app.staticTexts["page-state"], contains: "week")
+        app.buttons["next"].tap()
+        wait(app.staticTexts["page-state"], contains: "2024-02-18")
+        app.buttons["previous"].tap()
+        wait(app.staticTexts["page-state"], contains: "2024-02-11")
+        day(app, "2024-02-14").tap()
+        wait(app.staticTexts["selection-state"], contains: "2024-02-14")
+    }
+    @MainActor private func exerciseDynamicHeight() {
+        let app = launch("dynamicHeight")
+        let initial = app.otherElements["calendar"].frame.height
+        app.buttons["next"].tap()
+        wait(app.staticTexts["page-state"], contains: "2024-03")
+        XCTAssertGreaterThan(app.otherElements["calendar"].frame.height, initial)
+        app.buttons["previous"].tap()
+        wait(app.staticTexts["page-state"], contains: "2024-02")
+        XCTAssertEqual(app.otherElements["calendar"].frame.height, initial, accuracy: 1)
+    }
+    @MainActor private func recordDuration(_ name: String, since started: TimeInterval) {
+        let seconds = Date.timeIntervalSinceReferenceDate - started
+        let attachment = XCTAttachment(string: "implementation=\(implementation)\nmetric=\(name)\nseconds=\(seconds)\nIncludes XCUITest injection, synchronization, and predicate overhead; one sample.\n")
+        attachment.name = "\(implementation)-\(name)-measurement"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

@@ -158,8 +158,13 @@ scheme = f'''<?xml version="1.0" encoding="UTF-8"?>
 <AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
 </Scheme>'''
 (scheme_dir / 'CalendarShowcase.xcscheme').write_text(scheme)
+test_configurations = [{'id': 'DC72825C-8F40-4676-AF7B-963D9213993C', 'name': 'Legacy baseline',
+                        'options': {'environmentVariableEntries': [{'key': 'FSCALENDAR_IMPLEMENTATION', 'value': 'legacy'}]}}]
+if modern:
+    test_configurations.append({'id': 'C78C6D01-8479-4B6E-AB83-41FBA5CD4381', 'name': 'Swift rewrite',
+                                'options': {'environmentVariableEntries': [{'key': 'FSCALENDAR_IMPLEMENTATION', 'value': 'swift'}]}})
 test_plan = {
-    'configurations': [{'id': 'DC72825C-8F40-4676-AF7B-963D9213993C', 'name': 'Legacy baseline', 'options': {}}],
+    'configurations': test_configurations,
     'defaultOptions': {'uiTestingScreenshotsLifetime': 'keepAlways', 'userAttachmentLifetime': 'keepAlways',
                        'testTimeoutsEnabled': True},
     'testTargets': [{'parallelizable': False, 'target': {

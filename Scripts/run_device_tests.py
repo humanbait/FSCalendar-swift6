@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import time
+from summarize_results import write_summary
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -89,8 +90,13 @@ def main(arguments):
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     output = ROOT / "artifacts" / f"{label}-{stamp}"
     output.mkdir(parents=True)
+    selected_configurations = [arguments[i + 1] for i, value in enumerate(arguments[:-1])
+                               if value == "-only-test-configuration"]
+    configurations = selected_configurations or ["Legacy baseline", "Swift rewrite"]
     metadata = {
-        "startedAt": stamp, "implementation": "legacy", "requestedDevice": device,
+        "startedAt": stamp, "uiImplementations": ["swift" if c == "Swift rewrite" else "legacy" for c in configurations],
+        "testConfigurations": configurations, "hostedCoverage": "core, Swift UIKit contracts, shared drivers, legacy characterization",
+        "requestedDevice": device,
         "destination": f"platform=iOS,id={device}", "configuration": "Debug",
         "fixtures": {"calendar": "gregorian", "locale": "en_US_POSIX", "timeZone": "GMT",
                      "initialDate": "2024-02-14", "bounds": ["2020-01-01", "2030-12-31"],
@@ -109,6 +115,7 @@ def main(arguments):
     if preflight:
         metadata.update(exitCode=preflight, status="device-unavailable")
         save()
+        write_summary(output)
         print(f"Device preflight failed. See {output / 'device.txt'}")
         return preflight
     result_bundle = output / "Tests.xcresult"
@@ -144,6 +151,7 @@ def main(arguments):
             ["xcrun", "devicectl", "device", "process", "launch", "--device", device,
              "--terminate-existing", "com.spbgfs.fscalendar.calendarshowcase"], output / "demo-launch.log")
     save()
+    write_summary(output)
     print(json.dumps(metadata, indent=2))
     return status
 

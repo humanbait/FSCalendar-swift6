@@ -2,7 +2,7 @@ import UIKit
 @preconcurrency import FSCalendarLegacy
 
 @MainActor
-final class LegacyCalendarDriver: NSObject, CalendarDemoDriver, @preconcurrency FSCalendarDataSource, @preconcurrency FSCalendarDelegate, FSCalendarDelegateAppearance {
+final class LegacyCalendarDriver: NSObject, CalendarDemoDriver, @preconcurrency FSCalendarDataSource, @preconcurrency FSCalendarDelegate, @preconcurrency FSCalendarDelegateAppearance {
     let calendar = FSCalendarLegacy.FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 320))
     let scenario: DemoScenario
     var onChange: (() -> Void)?
@@ -54,6 +54,7 @@ final class LegacyCalendarDriver: NSObject, CalendarDemoDriver, @preconcurrency 
 
     func reset() {
         for date in calendar.selectedDates { calendar.deselect(date) }
+        calendar.setScope(scenario == .week ? .week : .month, animated: false)
         calendar.setCurrentPage(DemoFixtures.initialDate, animated: false)
         calendar.today = nil
         events.removeAll()
@@ -82,6 +83,15 @@ final class LegacyCalendarDriver: NSObject, CalendarDemoDriver, @preconcurrency 
     }
     func calendar(_ calendar: FSCalendarLegacy.FSCalendar, subtitleFor date: Date) -> String? {
         scenario == .content ? DemoFixtures.lunarSubtitle(date) : nil
+    }
+    func calendar(_ calendar: FSCalendarLegacy.FSCalendar, titleFor date: Date) -> String? {
+        scenario == .content && DemoFixtures.calendar.component(.day, from: date) == 1 ? "1st" : nil
+    }
+    func calendar(_ calendar: FSCalendarLegacy.FSCalendar, appearance: FSCalendarAppearance, titleDefaultColorFor date: Date) -> UIColor? {
+        scenario == .content && DemoFixtures.calendar.component(.day, from: date) == 14 ? .systemPink : nil
+    }
+    func calendar(_ calendar: FSCalendarLegacy.FSCalendar, appearance: FSCalendarAppearance, borderDefaultColorFor date: Date) -> UIColor? {
+        scenario == .content && DemoFixtures.calendar.component(.day, from: date) == 14 ? .systemPink : nil
     }
     func calendar(_ calendar: FSCalendarLegacy.FSCalendar, numberOfEventsFor date: Date) -> Int {
         [.content, .custom].contains(scenario) ? DemoFixtures.calendar.component(.day, from: date) % 4 : 0

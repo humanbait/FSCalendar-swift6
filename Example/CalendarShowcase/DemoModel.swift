@@ -79,8 +79,11 @@ protocol CalendarDemoDriver: AnyObject {
 
 @MainActor
 enum DemoDriverFactory {
-    static var implementations: [String] { ["legacy"] }
+    static var implementations: [String] { ["legacy", "swift"] }
     static func make(_ implementation: String, scenario: DemoScenario) -> any CalendarDemoDriver {
-        LegacyCalendarDriver(scenario: scenario)
+        switch implementation {
+        case "swift": SwiftCalendarDriver(scenario: scenario)
+        default: LegacyCalendarDriver(scenario: scenario)
+        }
     }
 }
