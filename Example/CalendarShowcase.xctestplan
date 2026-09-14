@@ -1,0 +1,33 @@
+{
+  "configurations": [
+    {
+      "id": "DC72825C-8F40-4676-AF7B-963D9213993C",
+      "name": "Legacy baseline",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "uiTestingScreenshotsLifetime": "keepAlways",
+    "userAttachmentLifetime": "keepAlways",
+    "testTimeoutsEnabled": true
+  },
+  "testTargets": [
+    {
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:CalendarShowcase.xcodeproj",
+        "identifier": "631974F29E71808D0C7A71B9",
+        "name": "CalendarShowcaseTests"
+      }
+    },
+    {
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:CalendarShowcase.xcodeproj",
+        "identifier": "C0376A1982B11CEE751A7FF5",
+        "name": "CalendarShowcaseUITests"
+      }
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,169 @@
+import UIKit
+
+@main
+@MainActor
+final class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        let arguments = ProcessInfo.processInfo.arguments
+        func argument(_ name: String) -> String? {
+            guard let i = arguments.firstIndex(of: name), arguments.indices.contains(i + 1) else { return nil }
+            return arguments[i + 1]
+        }
+        let implementation = argument("--implementation") ?? "legacy"
+        let root = ScenarioListController(implementation: implementation)
+        let navigation = UINavigationController(rootViewController: root)
+        navigation.navigationBar.prefersLargeTitles = true
+        if let name = argument("--scenario"), let scenario = DemoScenario(rawValue: name) {
+            navigation.pushViewController(ScenarioController(scenario: scenario, implementation: implementation), animated: false)
+        }
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        self.window = window
+        return true
+    }
+}
+
+@MainActor
+final class ScenarioListController: UITableViewController {
+    var implementation: String
+    init(implementation: String) { self.implementation = implementation; super.init(style: .insetGrouped) }
+    required init?(coder: NSCoder) { fatalError("Use init(implementation:)") }
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "Calendar Lab"
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: implementation.capitalized, style: .plain, target: self, action: #selector(changeImplementation))
+        tableView.accessibilityIdentifier = "scenarios"
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "scenario")
+    }
+    @objc private func changeImplementation() {
+        let values = DemoDriverFactory.implementations
+        implementation = values[((values.firstIndex(of: implementation) ?? 0) + 1) % values.count]
+        navigationItem.rightBarButtonItem?.title = implementation.capitalized
+    }
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { DemoScenario.allCases.count }
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "scenario", for: indexPath)
+        let scenario = DemoScenario.allCases[indexPath.row]
+        var content = cell.defaultContentConfiguration()
+        content.text = scenario.title
+        content.image = UIImage(systemName: "calendar")
+        cell.contentConfiguration = content
+        cell.accessoryType = .disclosureIndicator
+        cell.accessibilityIdentifier = "scenario.\(scenario.rawValue)"
+        return cell
+    }
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        navigationController?.pushViewController(ScenarioController(scenario: DemoScenario.allCases[indexPath.row], implementation: implementation), animated: true)
+    }
+}
+
+@MainActor
+final class ScenarioController: UIViewController, UITableViewDataSource, UIGestureRecognizerDelegate {
+    let scenario: DemoScenario
+    let driver: any CalendarDemoDriver
+    private let pageLabel = UILabel()
+    private let selectionLabel = UILabel()
+    private let eventLabel = UILabel()
+    private let table = UITableView(frame: .zero, style: .plain)
+    private var heightConstraint: NSLayoutConstraint!
+    private var didPresentFixture = false
+
+    init(scenario: DemoScenario, implementation: String) {
+        self.scenario = scenario
+        self.driver = DemoDriverFactory.make(implementation, scenario: scenario)
+        super.init(nibName: nil, bundle: nil)
+        title = scenario.title
+    }
+    required init?(coder: NSCoder) { fatalError("Use init(scenario:implementation:)") }
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemGroupedBackground
+        navigationItem.largeTitleDisplayMode = .never
+        if scenario == .dark { overrideUserInterfaceStyle = .dark }
+        if scenario == .rtl { view.semanticContentAttribute = .forceRightToLeft }
+        let controls = UIStackView(arrangedSubviews: [button("Previous", action: #selector(previousPage)), button("Next", action: #selector(nextPage)), button("Scope", action: #selector(scope)), button("Reset", action: #selector(reset))])
+        controls.distribution = .fillEqually
+        controls.spacing = 6
+        let stack = UIStackView(arrangedSubviews: [controls, driver.view, pageLabel, selectionLabel, eventLabel, table])
+        stack.axis = .vertical
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+        heightConstraint = driver.view.heightAnchor.constraint(equalToConstant: scenario == .week ? 120 : (scenario == .continuous ? 400 : 320))
+        heightConstraint.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            controls.heightAnchor.constraint(equalToConstant: 42), heightConstraint,
+            table.heightAnchor.constraint(greaterThanOrEqualToConstant: 30)
+        ])
+        for (label, id) in [(pageLabel, "page-state"), (selectionLabel, "selection-state"), (eventLabel, "event-state")] {
+            label.font = .preferredFont(forTextStyle: .caption1)
+            label.adjustsFontForContentSizeCategory = true
+            label.numberOfLines = 2
+            label.accessibilityIdentifier = id
+            label.setContentCompressionResistancePriority(.required, for: .vertical)
+        }
+        table.dataSource = self
+        table.accessibilityIdentifier = "agenda"
+        table.register(UITableViewCell.self, forCellReuseIdentifier: "row")
+        driver.onChange = { [weak self] in self?.updateState() }
+        driver.onHeightChange = { [weak self] height, _ in
+            guard let self else { return }
+            self.heightConstraint.constant = height
+            self.view.layoutIfNeeded()
+            self.updateState()
+        }
+        if scenario == .scope {
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(pan(_:)))
+            pan.delegate = self
+            view.addGestureRecognizer(pan)
+        }
+        updateState()
+    }
+    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); updateState() }
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !didPresentFixture {
+            didPresentFixture = true
+            driver.reset()
+        }
+    }
+    private func button(_ title: String, action: Selector) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.accessibilityIdentifier = title.lowercased()
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
+    }
+    private func updateState() {
+        let state = driver.state
+        pageLabel.text = "Page: \(DemoFixtures.text(state.page)) | Scope: \(state.scope)"
+        selectionLabel.text = "Selected: " + (state.selection.isEmpty ? "none" : state.selection.map(DemoFixtures.text).joined(separator: ", "))
+        eventLabel.text = "Events: " + (state.events.suffix(2).joined(separator: " | "))
+    }
+    @objc private func previousPage() { driver.navigate(-1) }
+    @objc private func nextPage() { driver.navigate(1) }
+    @objc private func scope() { driver.toggleScope() }
+    @objc private func reset() { driver.reset() }
+    @objc private func pan(_ sender: UIPanGestureRecognizer) { driver.handleScopeGesture(sender) }
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+        let velocity = pan.velocity(in: view)
+        return abs(velocity.y) > abs(velocity.x) && (table.contentOffset.y <= 0 || velocity.y < 0)
+    }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 30 }
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "row", for: indexPath)
+        var content = cell.defaultContentConfiguration()
+        content.text = "Agenda item \(indexPath.row + 1)"
+        content.secondaryText = "Scroll to exercise calendar and list coordination"
+        cell.contentConfiguration = content
+        return cell
+    }
+}
