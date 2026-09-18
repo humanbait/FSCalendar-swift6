@@ -9,7 +9,7 @@ This Swift package requires Swift 6.2+, Swift 6 language mode, iOS 16+, and macO
 - `Sources/FSCalendarAppKit/`: native AppKit rendering, input, and transitions.
 - `Tests/`: corresponding SwiftPM XCTest suites.
 - `Example/`: iOS and Mac showcase apps, Xcode project, hosted tests, and UI tests.
-- `Development/`: shared demo fixtures, renderer contract support, and the vendored Objective-C reference. Keep legacy code outside distributed library targets and preserve its attribution.
+- `Development/`: shared demo fixtures and renderer contract support. Preserve upstream attribution in the root license.
 - `Documentation/`: integration, behavior contracts, and validation records. Generated logs, screenshots, and results belong in ignored `artifacts/`.
 
 ## Build, Test, and Development Commands
@@ -21,7 +21,7 @@ Run commands from the repository root:
 - `swift test --filter CalendarEngineTests`: run a focused XCTest suite.
 - `./script/build_and_run.sh`: build and launch the native Mac showcase on Apple Silicon.
 - `./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64'`: run package, hosted, and UI tests with retained evidence.
-- `./Scripts/test-device.sh DEVICE_UDID comparison -collect-test-diagnostics never`: compare legacy and Swift implementations on a physical iOS device. Configure development signing for your account.
+- `./Scripts/test-device.sh DEVICE_UDID swift -collect-test-diagnostics never`: validate the Swift implementation on a physical iOS device. Configure development signing for your account.
 - `python3 Scripts/generate_project.py`: regenerate the checked-in Xcode project after adding files; inspect generated changes before committing.
 
 ## Coding Style & Naming Conventions

@@ -12,7 +12,7 @@ let package = Package(
     targets: [
         .target(name: "FSCalendarCore"),
         .target(name: "CalendarContractSupport", dependencies: ["FSCalendarCore"], path: "Development/ContractSupport"),
-        .target(name: "CalendarDemoSupport", dependencies: ["FSCalendarCore"], path: "Development/DemoSupport"),
+        .target(name: "CalendarDemoSupport", path: "Development/DemoSupport"),
         .target(name: "FSCalendarAppKit", dependencies: ["FSCalendarCore"]),
         .testTarget(name: "FSCalendarAppKitTests", dependencies: ["FSCalendarAppKit", "FSCalendarCore", "CalendarContractSupport"]),
         .target(name: "FSCalendar", dependencies: ["FSCalendarCore"]),

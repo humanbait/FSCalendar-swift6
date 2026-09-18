@@ -1,6 +1,6 @@
 # Swift calendar contracts
 
-The rewrite preserves shared capabilities while making the following deliberate API and behavior changes. Legacy characterization tests remain intact; new-contract tests must not silently change their expected results.
+The rewrite preserves shared capabilities while making the following deliberate API and behavior changes. The legacy column documents historical upstream behavior; regression tests enforce the Swift contract. The vendored reference and its characterization tests have been removed.
 
 | Behavior | Legacy reference | Swift contract |
 | --- | --- | --- |

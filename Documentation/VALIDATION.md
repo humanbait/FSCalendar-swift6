@@ -1,5 +1,8 @@
 # Validation — 2026-09-14
 
+> Historical validation record: these results predate removal of the vendored Objective-C reference. Legacy comparison commands and counts below describe that earlier checkout. Current instructions are in [TESTING.md](TESTING.md).
+
+
 The implemented Swift package and real Objective-C reference pass the automated physical-device suite. Manual accessibility and minimum-runtime checks below remain release gates; this report does not claim release certification.
 
 ## Device and toolchain

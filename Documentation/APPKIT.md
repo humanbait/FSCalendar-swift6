@@ -136,7 +136,7 @@ open -n artifacts/mac-run/Build/Products/Debug/CalendarShowcaseMac.app --args --
 The Mac scheme in `Example/CalendarShowcase.xcodeproj` links local SwiftPM library products.
 Shared demo fixtures and test assertions are development-only targets, never runtime product
 dependencies. `Scripts/generate_project.py` regenerates both platforms' checked-in project
-and schemes. `CalendarShowcaseMac.xctestplan` is independent of the frozen legacy baseline.
+and schemes. `CalendarShowcaseMac.xctestplan` is independent of the UIKit test plan.
 
 See [recorded results and release gates](MACOS-VALIDATION.md). Mac timing samples are only
 compared with runs on the same Mac, never with the iPhone baseline.

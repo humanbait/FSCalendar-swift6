@@ -17,7 +17,7 @@ This project builds on the ideas and behavior of [WenchaoD/FSCalendar](https://g
 - **Swift 6:** Swift 6 language mode with main-actor-isolated UI APIs.
 - **iOS and macOS:** UIKit and AppKit renderers share the same date engine.
 - **Migration:** Existing integrations require API changes. See the [migration guide](Documentation/MIGRATION.md).
-- **Behavior comparison:** The development showcase includes an original FSCalendar 2.8.4 reference for side-by-side testing. The reference and its adapters are excluded from the distributed SwiftPM libraries.
+- **Behavior contracts:** The Swift rewrite has dedicated core, UIKit, AppKit, and showcase tests. Historical upstream comparisons remain documented in the validation records.
 
 Release versions belong to this rewrite and do not correspond to upstream FSCalendar versions.
 
@@ -73,16 +73,16 @@ Defaults: Gregorian grids, Sunday first, current locale/time zone, horizontal mo
 
 ## Demo and tests
 
-Open `Example/CalendarShowcase.xcodeproj`, select **CalendarShowcase**, and run Calendar Lab. Its implementation selector switches between the real vendored Objective-C reference and the Swift rewrite. Eighteen scenarios demonstrate paging, continuous sticky headers, selection, placeholders, bounds, custom content/cells, range picking, transitions above a list, sizing, RTL, large text, and dark appearance.
+Open `Example/CalendarShowcase.xcodeproj`, select **CalendarShowcase**, and run Calendar Lab. The showcase runs the Swift implementation. Eighteen scenarios demonstrate paging, continuous sticky headers, selection, placeholders, bounds, custom content/cells, range picking, transitions above a list, sizing, RTL, large text, and dark appearance.
 
 ```sh
 swift test
-./Scripts/test-device.sh YOUR_DEVICE_UDID comparison -collect-test-diagnostics never
+./Scripts/test-device.sh YOUR_DEVICE_UDID swift -collect-test-diagnostics never
 ```
 
-The device script runs both configurations and saves results under ignored `artifacts/`. A successful run leaves the demo installed and opens its scenario list. The legacy physical-device baseline passed before implementation of the Swift products began.
+The device script runs the Swift configuration and saves results under ignored `artifacts/`. A successful run leaves the demo installed and opens its scenario list.
 
-See [migration/customization](Documentation/MIGRATION.md), [contracts](Documentation/CONTRACTS.md), [testing](Documentation/TESTING.md), and [actual validation results](Documentation/VALIDATION.md). iOS 16 runtime compatibility remains a separate release check from the iOS 17.7.2 physical-device suite.
+See [migration/customization](Documentation/MIGRATION.md), [contracts](Documentation/CONTRACTS.md), [testing](Documentation/TESTING.md), and [current validation results](Documentation/LEGACY-REMOVAL-VALIDATION.md). iOS 16 runtime compatibility remains a separate release check from the iOS 17.7.2 physical-device suite.
 
 ## Native Mac demo
 
@@ -94,4 +94,4 @@ Distributed under the [MIT License](LICENSE).
 
 Thanks to Wenchao Deng and the contributors to [the original FSCalendar](https://github.com/WenchaoD/FSCalendar) for their work. The original copyright and license notice are preserved.
 
-See [the development reference notes](Development/Legacy/README.md) for the vendored reference's provenance and source hashes. The upstream checkout was not modified.
+The former development-only Objective-C reference has been removed; its source and provenance remain available in Git history. See the [dependency audit](Documentation/DEPENDENCIES.md) for current library and development requirements.

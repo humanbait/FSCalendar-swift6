@@ -96,7 +96,7 @@ def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None
     if is_app:
         common.update({'INFOPLIST_KEY_CFBundleDisplayName': 'Calendar Lab', 'INFOPLIST_KEY_UILaunchScreen_Generation': 'YES',
                        'INFOPLIST_KEY_UISupportedInterfaceOrientations': 'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
-                       'INFOPLIST_KEY_UIRequiresFullScreen': 'YES', 'OTHER_LDFLAGS': ['$(inherited)', '-ObjC'],
+                       'INFOPLIST_KEY_UIRequiresFullScreen': 'YES',
                        'CURRENT_PROJECT_VERSION': '1', 'MARKETING_VERSION': '0.1.0'})
     if platform == "macos":
         for key in ['IPHONEOS_DEPLOYMENT_TARGET', 'TARGETED_DEVICE_FAMILY',
@@ -116,24 +116,18 @@ def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None
         buildRules=[], dependencies=deps, packageProductDependencies=package_refs, name=name, productName=name, productReference=product, productType=product_type)
     targets.append(tid)
 
-legacy = list((ROOT / 'Development/Legacy/FSCalendar').glob('*.[hm]'))
-target('FSCalendarLegacy', 'com.apple.product-type.framework', legacy)
-modern = (ROOT / 'Sources/FSCalendar/FSCalendar.swift').exists()
-if modern:
-    target('FSCalendarCore', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendarCore').rglob('*.swift'))
-    target('FSCalendar', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendar').rglob('*.swift'),
-           dependencies=['FSCalendarCore'], frameworks=['FSCalendarCore'])
-target('CalendarDemoSupport', 'com.apple.product-type.framework', (ROOT / 'Development/DemoSupport').rglob('*.swift'), dependencies=['FSCalendarCore'], frameworks=['FSCalendarCore'])
-libs = ['CalendarDemoSupport', 'FSCalendarLegacy'] + (['FSCalendarCore', 'FSCalendar'] if modern else [])
+target('FSCalendarCore', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendarCore').rglob('*.swift'))
+target('FSCalendar', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendar').rglob('*.swift'),
+       dependencies=['FSCalendarCore'], frameworks=['FSCalendarCore'])
+target('CalendarDemoSupport', 'com.apple.product-type.framework', (ROOT / 'Development/DemoSupport').rglob('*.swift'))
+libs = ['CalendarDemoSupport', 'FSCalendarCore', 'FSCalendar']
 target('CalendarShowcase', 'com.apple.product-type.application', (ROOT / 'Example/CalendarShowcase').rglob('*.swift'), dependencies=libs, frameworks=libs)
 contract_paths = list((ROOT / 'Development/ContractSupport').rglob('*.swift'))
-unit_paths = contract_paths + list((ROOT / 'Example/CalendarShowcaseTests').rglob('*.swift')) + list((ROOT / 'Example/CalendarShowcaseTests').glob('*.m'))
-if modern:
-    unit_paths += list((ROOT / 'Tests/FSCalendarCoreTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarTests').rglob('*.swift'))
+unit_paths = contract_paths + list((ROOT / 'Example/CalendarShowcaseTests').rglob('*.swift'))
+unit_paths += list((ROOT / 'Tests/FSCalendarCoreTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarTests').rglob('*.swift'))
 target('CalendarShowcaseTests', 'com.apple.product-type.bundle.unit-test', unit_paths,
        dependencies=['CalendarShowcase'], frameworks=libs,
-       extra={'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/CalendarShowcase.app/CalendarShowcase', 'BUNDLE_LOADER': '$(TEST_HOST)',
-              'HEADER_SEARCH_PATHS': ['$(inherited)', '$(SRCROOT)/../Development/Legacy/FSCalendar']})
+       extra={'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/CalendarShowcase.app/CalendarShowcase', 'BUNDLE_LOADER': '$(TEST_HOST)'})
 target('CalendarShowcaseUITests', 'com.apple.product-type.bundle.ui-testing', (ROOT / 'Example/CalendarShowcaseUITests').rglob('*.swift'),
        dependencies=['CalendarShowcase'], extra={'TEST_TARGET_NAME': 'CalendarShowcase'})
 local_package = obj('local-package', 'XCLocalSwiftPackageReference', relativePath='..')
@@ -176,23 +170,19 @@ def build_ref(name):
 scheme_dir = PROJECT / 'xcshareddata/xcschemes'
 scheme_dir.mkdir(parents=True, exist_ok=True)
 scheme = f'''<?xml version="1.0" encoding="UTF-8"?>
-<Scheme LastUpgradeVersion="2600" version="1.3">
+<Scheme LastUpgradeVersion="2600" version="1.7">
 <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries>
 <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">{build_ref('CalendarShowcase')}</BuildActionEntry>
 </BuildActionEntries></BuildAction>
 <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
 <TestPlans><TestPlanReference reference="container:CalendarShowcase.xctestplan" default="YES"/></TestPlans>
 </TestAction>
-<LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{build_ref('CalendarShowcase')}</BuildableProductRunnable></LaunchAction>
+<LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{build_ref('CalendarShowcase')}</BuildableProductRunnable></LaunchAction>
 <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">{build_ref('CalendarShowcase')}</BuildableProductRunnable></ProfileAction>
 <AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
 </Scheme>'''
 (scheme_dir / 'CalendarShowcase.xcscheme').write_text(scheme)
-test_configurations = [{'id': 'DC72825C-8F40-4676-AF7B-963D9213993C', 'name': 'Legacy baseline',
-                        'options': {'environmentVariableEntries': [{'key': 'FSCALENDAR_IMPLEMENTATION', 'value': 'legacy'}]}}]
-if modern:
-    test_configurations.append({'id': 'C78C6D01-8479-4B6E-AB83-41FBA5CD4381', 'name': 'Swift rewrite',
-                                'options': {'environmentVariableEntries': [{'key': 'FSCALENDAR_IMPLEMENTATION', 'value': 'swift'}]}})
+test_configurations = [{'id': 'C78C6D01-8479-4B6E-AB83-41FBA5CD4381', 'name': 'Swift rewrite', 'options': {}}]
 test_plan = {
     'configurations': test_configurations,
     'defaultOptions': {'uiTestingScreenshotsLifetime': 'keepAlways', 'userAttachmentLifetime': 'keepAlways',

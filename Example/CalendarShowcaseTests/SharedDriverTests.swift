@@ -21,7 +21,7 @@ final class SharedDriverTests: XCTestCase {
             window.makeKeyAndVisible()
         }
         for scenario in [DemoScenario.month, .week, .variable, .continuous] {
-            let page = ScenarioController(scenario: scenario, implementation: "swift")
+            let page = ScenarioController(scenario: scenario)
             let navigation = UINavigationController(rootViewController: page)
             navigation.loadViewIfNeeded()
             navigation.view.frame = window.bounds
@@ -95,35 +95,31 @@ final class SharedDriverTests: XCTestCase {
         window.makeKeyAndVisible(); driver.view.layoutIfNeeded()
         return window
     }
-    @MainActor func testEveryImplementationAndScenarioRendersTheFixture() {
-        for implementation in DemoDriverFactory.implementations {
-            for scenario in DemoScenario.allCases {
-                let driver = DemoDriverFactory.make(implementation, scenario: scenario)
-                let window = host(driver)
-                defer { window.isHidden = true }
-                XCTAssertEqual(driver.state.scope, scenario == .week ? "week" : "month", "\(implementation)/\(scenario)")
-                XCTAssertTrue(DemoFixtures.text(driver.state.page).hasPrefix("2024-02"), "\(implementation)/\(scenario): \(driver.state.page)")
-                XCTAssertTrue(driver.state.selection.isEmpty)
-                func containsFixtureDay(_ view: UIView) -> Bool {
-                    if view.accessibilityIdentifier?.hasPrefix("day.2024-02-14.1.") == true { return true }
-                    return view.subviews.contains(where: containsFixtureDay)
-                }
-                XCTAssertTrue(containsFixtureDay(driver.view), "Missing visible fixture day: \(implementation)/\(scenario)")
+    @MainActor func testEveryScenarioRendersTheFixture() {
+        for scenario in DemoScenario.allCases {
+            let driver = SwiftCalendarDriver(scenario: scenario)
+            let window = host(driver)
+            defer { window.isHidden = true }
+            XCTAssertEqual(driver.state.scope, scenario == .week ? "week" : "month", "\(scenario)")
+            XCTAssertTrue(DemoFixtures.text(driver.state.page).hasPrefix("2024-02"), "\(scenario): \(driver.state.page)")
+            XCTAssertTrue(driver.state.selection.isEmpty)
+            func containsFixtureDay(_ view: UIView) -> Bool {
+                if view.accessibilityIdentifier?.hasPrefix("day.2024-02-14.1.") == true { return true }
+                return view.subviews.contains(where: containsFixtureDay)
             }
+            XCTAssertTrue(containsFixtureDay(driver.view), "Missing visible fixture day: \(scenario)")
         }
     }
-    @MainActor func testSharedSelectionAndReloadPersistence() {
-        for implementation in DemoDriverFactory.implementations {
-            let driver = DemoDriverFactory.make(implementation, scenario: .multiple)
-            let window = host(driver); defer { window.isHidden = true }
-            let a = DemoFixtures.date("2024-02-12"), b = DemoFixtures.date("2024-02-14")
-            driver.select(a); driver.select(b); driver.reloadContent(); driver.view.layoutIfNeeded()
-            XCTAssertEqual(driver.state.selection, [a, b], implementation)
-            driver.deselect(a)
-            XCTAssertEqual(driver.state.selection, [b], implementation)
-            driver.reset()
-            XCTAssertTrue(driver.state.selection.isEmpty, implementation)
-        }
+    @MainActor func testSwiftSelectionAndReloadPersistence() {
+        let driver = SwiftCalendarDriver(scenario: .multiple)
+        let window = host(driver); defer { window.isHidden = true }
+        let a = DemoFixtures.date("2024-02-12"), b = DemoFixtures.date("2024-02-14")
+        driver.select(a); driver.select(b); driver.reloadContent(); driver.view.layoutIfNeeded()
+        XCTAssertEqual(driver.state.selection, [a, b])
+        driver.deselect(a)
+        XCTAssertEqual(driver.state.selection, [b])
+        driver.reset()
+        XCTAssertTrue(driver.state.selection.isEmpty)
     }
     @MainActor func testSwiftRepeatedNavigationPerformance() {
         let driver = SwiftCalendarDriver(scenario: .month)

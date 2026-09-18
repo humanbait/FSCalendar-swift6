@@ -1,5 +1,8 @@
 # XCTest connection recovery investigation
 
+> Historical validation record: these results predate removal of the vendored Objective-C reference. Legacy comparison commands and counts below describe that earlier checkout. Current instructions are in [TESTING.md](TESTING.md).
+
+
 ## Verified recovery
 
 After restarting the iPhone, retaining attachments alone still produced inter-test XCTest disconnections. Grouping the unchanged UI checks into one test with 11 named `XCTContext` activities avoided that boundary. `baseline-matrix-20260914T134312831511Z` passed all 15 tests (14 hosted plus the UI matrix), with zero failures and xcodebuild exit code 0. The date grid also received a unique adapter accessibility identifier to distinguish it from the month-header collection view. No upstream framework implementation was modified.

@@ -1,5 +1,8 @@
 # Native Mac validation — 2026-09-18
 
+> Historical validation record: these results predate removal of the vendored Objective-C reference. Legacy comparison commands and counts below describe that earlier checkout. Current instructions are in [TESTING.md](TESTING.md).
+
+
 ## Environment and evidence
 
 Native destination: `platform=macOS,arch=arm64`. Mac mini (Mac16,10), Apple M4,

@@ -12,12 +12,11 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             guard let i = arguments.firstIndex(of: name), arguments.indices.contains(i + 1) else { return nil }
             return arguments[i + 1]
         }
-        let implementation = argument("--implementation") ?? "legacy"
-        let root = ScenarioListController(implementation: implementation)
+        let root = ScenarioListController()
         let navigation = UINavigationController(rootViewController: root)
         navigation.navigationBar.prefersLargeTitles = true
         if let name = argument("--scenario"), let scenario = DemoScenario(rawValue: name) {
-            navigation.pushViewController(ScenarioController(scenario: scenario, implementation: implementation), animated: false)
+            navigation.pushViewController(ScenarioController(scenario: scenario), animated: false)
         }
         window.rootViewController = navigation
         window.makeKeyAndVisible()
@@ -28,20 +27,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
 @MainActor
 final class ScenarioListController: UITableViewController {
-    var implementation: String
-    init(implementation: String) { self.implementation = implementation; super.init(style: .insetGrouped) }
-    required init?(coder: NSCoder) { fatalError("Use init(implementation:)") }
+    init() { super.init(style: .insetGrouped) }
+    required init?(coder: NSCoder) { fatalError("Use init()") }
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Calendar Lab"
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: implementation.capitalized, style: .plain, target: self, action: #selector(changeImplementation))
         tableView.accessibilityIdentifier = "scenarios"
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "scenario")
-    }
-    @objc private func changeImplementation() {
-        let values = DemoDriverFactory.implementations
-        implementation = values[((values.firstIndex(of: implementation) ?? 0) + 1) % values.count]
-        navigationItem.rightBarButtonItem?.title = implementation.capitalized
     }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { DemoScenario.allCases.count }
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -56,7 +48,7 @@ final class ScenarioListController: UITableViewController {
         return cell
     }
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        navigationController?.pushViewController(ScenarioController(scenario: DemoScenario.allCases[indexPath.row], implementation: implementation), animated: true)
+        navigationController?.pushViewController(ScenarioController(scenario: DemoScenario.allCases[indexPath.row]), animated: true)
     }
 }
 
@@ -70,13 +62,13 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
     private let table = UITableView(frame: .zero, style: .plain)
     private var heightConstraint: NSLayoutConstraint!
 
-    init(scenario: DemoScenario, implementation: String) {
+    init(scenario: DemoScenario) {
         self.scenario = scenario
-        self.driver = DemoDriverFactory.make(implementation, scenario: scenario)
+        self.driver = SwiftCalendarDriver(scenario: scenario)
         super.init(nibName: nil, bundle: nil)
         title = scenario.title
     }
-    required init?(coder: NSCoder) { fatalError("Use init(scenario:implementation:)") }
+    required init?(coder: NSCoder) { fatalError("Use init(scenario:)") }
     override func didMove(toParent parent: UIViewController?) {
         super.didMove(toParent: parent)
         if scenario == .largeText {

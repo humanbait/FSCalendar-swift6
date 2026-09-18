@@ -92,10 +92,10 @@ def main(arguments):
     output.mkdir(parents=True)
     selected_configurations = [arguments[i + 1] for i, value in enumerate(arguments[:-1])
                                if value == "-only-test-configuration"]
-    configurations = selected_configurations or ["Legacy baseline", "Swift rewrite"]
+    configurations = selected_configurations or ["Swift rewrite"]
     metadata = {
-        "startedAt": stamp, "uiImplementations": ["swift" if c == "Swift rewrite" else "legacy" for c in configurations],
-        "testConfigurations": configurations, "hostedCoverage": "core, Swift UIKit contracts, shared drivers, legacy characterization",
+        "startedAt": stamp, "uiImplementations": ["swift"],
+        "testConfigurations": configurations, "hostedCoverage": "core, Swift UIKit contracts, Swift driver",
         "requestedDevice": device,
         "destination": f"platform=iOS,id={device}", "configuration": "Debug",
         "fixtures": {"calendar": "gregorian", "locale": "en_US_POSIX", "timeZone": "GMT",

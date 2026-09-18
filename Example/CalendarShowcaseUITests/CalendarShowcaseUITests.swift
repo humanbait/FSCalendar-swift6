@@ -1,7 +1,7 @@
 import XCTest
 
 final class CalendarShowcaseUITests: XCTestCase {
-    private var implementation: String { ProcessInfo.processInfo.environment["FSCALENDAR_IMPLEMENTATION"] ?? "legacy" }
+    private let implementation = "swift"
     // Xcode 27's device runner can disconnect during inter-test attachment cleanup on iOS 17.
     // Keep the unchanged scenario assertions in one test, with individually named result activities.
     @MainActor func testSharedScenarioMatrix() throws {
@@ -74,7 +74,7 @@ final class CalendarShowcaseUITests: XCTestCase {
 
     @MainActor private func launch(_ scenario: String) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--scenario", scenario, "--implementation", implementation]
+        app.launchArguments = ["--scenario", scenario]
         app.launch()
         XCTAssertTrue(app.staticTexts["page-state"].waitForExistence(timeout: 10))
         return app
@@ -186,7 +186,7 @@ final class CalendarShowcaseUITests: XCTestCase {
     @MainActor private func exerciseLaunchPerformance() {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             let app = XCUIApplication()
-            app.launchArguments = ["--implementation", implementation, "--scenario", "month"]
+            app.launchArguments = ["--scenario", "month"]
             app.launch()
         }
     }

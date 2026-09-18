@@ -1,5 +1,8 @@
 # Native macOS implementation progress
 
+> Historical progress record from before removal of the Objective-C reference. See Documentation/TESTING.md for current Swift-only validation instructions.
+
+
 Milestone 1: three package products; shared Foundation presentation types and transition planner;
 platform-independent demo contract; native Mac app bundle, hosted tests, UI tests, scheme/test plan,
 and canonical build/run command. No renderer is claimed at this scaffold milestone.
