@@ -50,6 +50,8 @@ import FSCalendarAppKit
         eventReadout.setAccessibilityIdentifier("state.events"); eventsScroll.documentView = eventReadout
         eventsScroll.hasVerticalScroller = true; eventsScroll.borderType = .lineBorder
         content.addSubview(eventsScroll)
+        scopeHandle.addGestureRecognizer(NSPanGestureRecognizer(target: self, action: #selector(scopePan(_:))))
+        scopeHandle.target = self; scopeHandle.action = #selector(toggleScopeFromHandle)
         scopeHandle.setAccessibilityIdentifier("scope.handle"); content.addSubview(scopeHandle)
         agendaText.isEditable = false; agendaText.font = .systemFont(ofSize: 15)
         agendaText.string = (1...40).map { "Agenda item \($0) — scrolling this list keeps the calendar mode unchanged." }.joined(separator: "\n\n")
@@ -58,6 +60,10 @@ import FSCalendarAppKit
         let arguments = ProcessInfo.processInfo.arguments
         if let index = arguments.firstIndex(of: "--scenario"), arguments.indices.contains(index + 1), let requested = DemoScenario(rawValue: arguments[index + 1]) { scenario = requested }
         show(scenario)
+    }
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        view.window?.appearance = view.appearance
     }
     func show(_ scenario: DemoScenario) {
         driver?.view.removeFromSuperview()
@@ -68,10 +74,13 @@ import FSCalendarAppKit
         scenarios.selectItem(at: DemoScenario.allCases.firstIndex(of: scenario)!)
         for button in sidebarButtons { button.state = DemoScenario.allCases[button.tag] == scenario ? .on : .off }
         view.appearance = scenario == .dark ? NSAppearance(named: .darkAqua) : nil
+        view.window?.appearance = view.appearance
         scopeHandle.isHidden = scenario != .scope; agenda.isHidden = scenario != .scope
         updateReadout(); view.needsLayout = true
         contentScroll.contentView.scroll(to: .zero)
     }
+    @objc private func scopePan(_ gesture: NSPanGestureRecognizer) { driver.handleScopeGesture(gesture) }
+    @objc private func toggleScopeFromHandle() { driver.toggleScope() }
     @objc private func chooseScenario(_ sender: NSPopUpButton) { show(DemoScenario.allCases[sender.indexOfSelectedItem]) }
     @objc private func sidebarChoice(_ sender: NSButton) { show(DemoScenario.allCases[sender.tag]) }
     @objc private func control(_ sender: NSButton) {

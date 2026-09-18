@@ -15,6 +15,10 @@ final class MacHostTests: XCTestCase {
         let center = item.view.convert(NSPoint(x: item.view.bounds.midX, y: item.view.bounds.midY), to: controller.view.superview)
         let hit = controller.view.hitTest(center)
         XCTAssertTrue(hit === item.view)
+        controller.show(.dark)
+        XCTAssertEqual(window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
+        controller.show(.month)
+        XCTAssertNil(window.appearance)
     }
     @MainActor func testCalendarHostedInWindow() {
         let view = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 480, height: 340))

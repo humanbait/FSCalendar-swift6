@@ -29,3 +29,18 @@ and fallback, lunar subtitles/images/events, range example, explicit large fonts
 a date on every scenario and retained screenshots. Evidence: artifacts/mac-m5-flat-accessibility.xcresult.
 The collection exposes visible day views directly in accessibility, avoiding AppKit's disabled
 intermediate section elements. Native nested-scroll hit testing also has a hosted regression check.
+
+Milestone 6: explicit interactive/settling state, cancellable main-actor animation, source state
+until completion, anchoring, replacement/cancellation, resize/configuration handling, external
+scope handle, observed Reduce Motion, and native accessibility/focus state. The complete run
+passed 33 package tests and 27 Mac Xcode tests; evidence is
+artifacts/mac-complete2-20260918T143347Z. Mac clock/memory/launch samples and all 18 screenshots
+were exported. A subsequent demo-only dark-window fix is covered by hosted appearance checks
+and the passing focused scenario rerun in artifacts/mac-appearance-final-20260918T144327Z
+(2 hosted tests plus the 18-scenario UI matrix). See Documentation/MACOS-VALIDATION.md.
+
+Physical iPhone regression after shared-code changes: 106 passing executions, 53 in each
+legacy/Swift configuration, iPhone 11 on iOS 17.7.2. Evidence:
+artifacts/mac-final-ios-regression-20260918T143708074880Z. The UIKit product also builds with
+Swift warnings as errors. macOS 13, iOS 16 runtime, exact Swift 6.2 and human VoiceOver speech
+review remain explicitly documented release gates. No vendored Objective-C source was changed.

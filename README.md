@@ -1,13 +1,14 @@
 # FSCalendar — Swift 6
 
-A UIKit calendar with a Foundation date engine. Requires Swift 6.2 or later, Swift 6 language mode, and iOS 16 or later. The package contains no SwiftUI, networking, third-party runtime dependency, or Objective-C forwarding.
+Native UIKit and AppKit calendars with a shared Foundation date engine. Requires Swift 6.2 or later, Swift 6 language mode, and iOS 16+ or macOS 13+. The package contains no SwiftUI, networking, third-party runtime dependency, or Objective-C forwarding.
 
 | SwiftPM product | Contents |
 | --- | --- |
 | `FSCalendarCore` | Civil dates, page/occurrence identities, Gregorian grids, inclusive bounds, ordered selection transactions |
 | `FSCalendar` | Main-actor UIKit view, custom collection layout, reusable cells, appearance, gestures, interactive transitions |
+| `FSCalendarAppKit` | Native AppKit view, reusable items, mouse/keyboard focus, all layout modes and cancellable transitions |
 
-Add this directory as a local package in Xcode, or add its Git URL after publishing the repository. Link both products to your UIKit app. The Foundation core also supports macOS 13+ for host-side tests; the view requires UIKit.
+Add this directory as a local package in Xcode, or add its Git URL after publishing the repository. Link `FSCalendar` and `FSCalendarCore` to your UIKit app. For native Mac apps, link `FSCalendarAppKit` and `FSCalendarCore`; see the [AppKit integration guide](Documentation/APPKIT.md).
 
 ```swift
 import UIKit
@@ -67,6 +68,10 @@ swift test
 The device script runs both configurations and saves results under ignored `artifacts/`. A successful run leaves the demo installed and opens its scenario list. The legacy physical-device baseline passed before implementation of the Swift products began.
 
 See [migration/customization](Documentation/MIGRATION.md), [contracts](Documentation/CONTRACTS.md), [testing](Documentation/TESTING.md), and [actual validation results](Documentation/VALIDATION.md). iOS 16 runtime compatibility remains a separate release check from the iOS 17.7.2 physical-device suite.
+
+## Native Mac demo
+
+Run `./script/build_and_run.sh`, or choose **CalendarShowcaseMac** in the checked-in Xcode project. All 18 scenarios use native AppKit controls and shared fixtures. Run `./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64'` for package, hosted and UI tests with artifacts and performance measurements. See [Mac validation](Documentation/MACOS-VALIDATION.md) for actual results and pending release gates.
 
 ## License
 

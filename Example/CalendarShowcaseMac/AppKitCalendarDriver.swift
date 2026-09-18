@@ -3,7 +3,10 @@ import AppKit
 import FSCalendarAppKit
 import FSCalendarCore
 
-@MainActor protocol AppKitCalendarDemoDriver: CalendarDemoDriver { var view: NSView { get } }
+@MainActor protocol AppKitCalendarDemoDriver: CalendarDemoDriver {
+    var view: NSView { get }
+    func handleScopeGesture(_ gesture: NSPanGestureRecognizer)
+}
 
 @MainActor final class AppKitCalendarDriver: AppKitCalendarDemoDriver, FSCalendarDataSource, FSCalendarDelegate {
     let calendar = FSCalendarView(frame: CGRect(x: 0, y: 0, width: 350, height: 340))
@@ -62,6 +65,7 @@ import FSCalendarCore
         guard scenario != .continuous else { return }
         perform { try calendar.setDisplayMode(calendar.displayMode == .week ? .month(.horizontal) : .week) }
     }
+    func handleScopeGesture(_ gesture: NSPanGestureRecognizer) { calendar.handleScopeGesture(gesture) }
     func reloadContent() { calendar.reloadData(); onChange?() }
     private func perform(_ action: () throws -> Void) {
         do { try action() } catch { append("rejected: \(error)") }

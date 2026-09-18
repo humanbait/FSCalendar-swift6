@@ -43,6 +43,48 @@ final class CalendarContentTests: XCTestCase {
         provider.identifier = "unknown"; view.reloadData(); view.layoutSubtreeIfNeeded()
         XCTAssertFalse(try item() is CustomItem)
     }
+    @MainActor func testAccessibilitySelectionDisabledStateAndKeyboardExit() throws {
+        _ = NSApplication.shared
+        let view = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 340))
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        let configuration = try CalendarConfiguration(
+            minimumDate: CivilDay(year: 2024, month: 2, day: 10),
+            maximumDate: CivilDay(year: 2024, month: 2, day: 20),
+            timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX"))
+        try view.apply(configuration: configuration); try view.setCurrentPage(day); view.today = day
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let container = NSView(frame: window.contentView!.bounds), next = NSTextField(frame: NSRect(x: 0, y: 350, width: 100, height: 24))
+        container.addSubview(view); container.addSubview(next); window.contentView = container
+        window.orderFront(nil); defer { window.close() }
+        view.layoutSubtreeIfNeeded()
+        func dayView(_ value: CivilDay) throws -> NSView {
+            try XCTUnwrap(view.collectionView.visibleItems().compactMap { $0 as? FSCalendarItem }.first { $0.dayState?.occurrence.day == value }?.view)
+        }
+        let cell = try dayView(day)
+        XCTAssertEqual(cell.accessibilityLabel(), "Wednesday, February 14, 2024")
+        XCTAssertTrue(cell.isAccessibilityEnabled())
+        XCTAssertFalse(try dayView(day.addingDays(-5)).isAccessibilityEnabled())
+        window.makeFirstResponder(view); try view.focus(day)
+        XCTAssertTrue(cell.isAccessibilityFocused())
+        try view.select(day)
+        XCTAssertTrue(cell.isAccessibilitySelected())
+        XCTAssertTrue((cell.accessibilityValue() as? String ?? "").contains("selected"))
+        XCTAssertTrue((cell.accessibilityValue() as? String ?? "").contains("today"))
+        view.nextKeyView = next
+        let tab = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48))
+        view.keyDown(with: tab)
+        XCTAssertFalse(window.firstResponder === view)
+        XCTAssertFalse(view.hasKeyboardFocus); XCTAssertFalse(cell.isAccessibilityFocused())
+        XCTAssertEqual(view.selectedDays, [day])
+        try view.apply(configuration: CalendarConfiguration(minimumDate: configuration.minimumDate,
+            maximumDate: configuration.maximumDate, timeZone: configuration.timeZone, locale: configuration.locale, selectionMode: .disabled))
+        view.layoutSubtreeIfNeeded()
+        let disabled = try dayView(day)
+        XCTAssertFalse(disabled.isAccessibilityEnabled()); XCTAssertFalse(disabled.accessibilityPerformPress())
+        XCTAssertTrue(view.selectedDays.isEmpty)
+    }
     @MainActor func testViewReleasesItsControllersAndItems() {
         _ = NSApplication.shared
         weak var reference: FSCalendarView?

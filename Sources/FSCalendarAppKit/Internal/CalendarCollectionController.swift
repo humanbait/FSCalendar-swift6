@@ -8,7 +8,7 @@ import FSCalendarCore
     var recency: [PageID] = []
     var registered: Set<String> = ["default"]
     func grid(_ section: Int) -> CalendarGrid? {
-        guard let owner, let id = try? owner.engine.page(at: section, scope: owner.displayMode.scope) else { return nil }
+        guard let owner, let id = try? owner.engine.page(at: section, scope: owner.renderingMode.scope) else { return nil }
         recency.removeAll { $0 == id }; recency.append(id)
         if let grid = cache[id] { return grid }
         guard let grid = try? owner.engine.grid(containing: id.anchor, scope: id.scope) else { return nil }
@@ -23,6 +23,7 @@ import FSCalendarCore
             header.label.stringValue = (try? page.anchor.date(in: owner.configuration.timeZone)).map { owner.formatter("LLLL yyyy").string(from: $0) } ?? page.anchor.description
             header.label.font = owner.metrics.headerFont; header.label.textColor = owner.metrics.headerColor
             header.wantsLayer = true; owner.effectiveAppearance.performAsCurrentDrawingAppearance { header.layer?.backgroundColor = owner.metrics.backgroundColor.cgColor }
+            header.setAccessibilityElement(true); header.setAccessibilityRole(.staticText); header.setAccessibilityLabel(header.label.stringValue)
             header.setAccessibilityIdentifier("month.\(page.anchor)")
         }
         return view

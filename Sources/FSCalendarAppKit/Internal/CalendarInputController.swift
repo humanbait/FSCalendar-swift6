@@ -13,7 +13,7 @@ import FSCalendarCore
     deinit { scrollTask?.cancel() }
     func cancelScroll() { scrollTask?.cancel(); scrollTask = nil; scrollStart = nil; scrollDistance = 0 }
     func accumulateScroll(_ delta: CGFloat, ended: Bool) {
-        guard let owner, !owner.displayMode.isContinuous, delta.isFinite else { return }
+        guard let owner, owner.transitionState == .idle, !owner.displayMode.isContinuous, delta.isFinite else { return }
         if scrollStart == nil { scrollStart = owner.scrollView.contentView.bounds.origin }
         scrollDistance -= delta
         var position = scrollStart ?? .zero
@@ -42,7 +42,7 @@ import FSCalendarCore
         if let day = try? owner.engine.page(at: index, scope: owner.displayMode.scope).anchor { try? owner.setCurrentPage(day) }
     }
     func begin(_ day: CivilDay) {
-        guard let owner, owner.engine.isSelectable(day) else { return }
+        guard let owner, owner.transitionState == .idle, owner.engine.isSelectable(day) else { return }
         owner.window?.makeFirstResponder(owner)
         try? owner.focus(day)
         visited = []; removes = owner.selectedDays.contains(day); dragging = true
@@ -80,10 +80,13 @@ import FSCalendarCore
 }
 
 @MainActor final class CalendarCollectionView: NSCollectionView {
+    override var acceptsFirstResponder: Bool { false }
     override func accessibilityChildren() -> [Any]? {
-        visibleItems().filter { !$0.view.isHidden && $0.view.frame.intersects(visibleRect) }
-            .sorted { ($0 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "" < ($1 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "" }
+        let days = visibleItems().filter { !$0.view.isHidden && $0.view.frame.intersects(visibleRect) }
+            .sorted { (($0 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "") < (($1 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "") }
             .map(\.view)
+        let headers = visibleSupplementaryViews(ofKind: NSCollectionView.elementKindSectionHeader).filter { $0.frame.intersects(visibleRect) }
+        return headers + days
     }
     override func setFrameSize(_ newSize: NSSize) {
         let content = collectionViewLayout?.collectionViewContentSize ?? .zero
@@ -92,9 +95,11 @@ import FSCalendarCore
 }
 
 @MainActor final class CalendarScrollView: NSScrollView {
+    override var acceptsFirstResponder: Bool { false }
     weak var owner: FSCalendarView?
     override func scrollWheel(with event: NSEvent) {
         guard let owner else { super.scrollWheel(with: event); return }
+        guard owner.transitionState == .idle else { return }
         if owner.displayMode.isContinuous { super.scrollWheel(with: event); return }
         let delta = owner.displayMode.isHorizontal && abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
         owner.input.accumulateScroll(delta, ended: event.momentumPhase == .ended || event.phase == .cancelled)
@@ -105,6 +110,8 @@ import FSCalendarCore
     weak var owner: FSCalendarView?
     var day: CivilDay?
     override func accessibilityChildren() -> [Any]? { [] }
+    override func isAccessibilityFocused() -> Bool { owner?.focusedDay == day && owner?.window?.firstResponder === owner }
+    override func isAccessibilitySelected() -> Bool { day.map { owner?.selectedDays.contains($0) ?? false } ?? false }
     override func accessibilityFrame() -> NSRect {
         guard let window else { return .zero }
         return window.convertToScreen(convert(bounds, to: nil))
@@ -116,7 +123,7 @@ import FSCalendarCore
     }
     override func mouseUp(with event: NSEvent) { owner?.input.end() }
     override func accessibilityPerformPress() -> Bool {
-        guard let owner, let day, owner.engine.isSelectable(day) else { return false }
+        guard let owner, let day, owner.engine.isSelectable(day), owner.configuration.selectionMode != .disabled else { return false }
         owner.input.activate(day); return true
     }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

@@ -40,3 +40,20 @@ Fixtures: Gregorian, GMT, en_US_POSIX, initial/today 2024-02-14, bounds 2020-01-
 Automated labels/traits/description audits, RTL, Dynamic Type, and screenshots are distinct from hands-on VoiceOver and Reduce Motion observations. Record manual observations separately. An iOS 17 device pass does not establish iOS 16 runtime or exact Swift 6.2 compiler compatibility.
 
 After adding files, regenerate the checked-in project with `python3 Scripts/generate_project.py`; only Python's standard library is needed. Package consumers do not use the project or any legacy/demo target.
+
+## Native macOS
+
+The independent `CalendarShowcaseMac` scheme and test plan run AppKit window-hosted tests,
+shared renderer contracts, all 18 scenario UI checks, desktop input and transition checks,
+and Mac-specific clock, memory and launch measurements.
+
+```sh
+./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64'
+./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64' --label input -- -only-testing:CalendarShowcaseMacUITests/MacUITests/testMouseToggleAndKeyboardFocus
+```
+
+The runner first executes SwiftPM tests with warnings as errors, then Xcode tests against
+the explicit Mac destination. Every run records source hashes (including uncommitted files),
+Git revision/status, hardware, OS, compiler, fixtures, logs, `.xcresult`, exported screenshots
+and metrics. Passing runs reopen the Mac demo. See [AppKit integration](APPKIT.md) and
+[Mac validation](MACOS-VALIDATION.md) for evidence and remaining runtime release gates.
