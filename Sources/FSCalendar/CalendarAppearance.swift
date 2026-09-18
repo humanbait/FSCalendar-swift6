@@ -91,6 +91,9 @@ public extension FSCalendarDataSource {
     func calendar(_ calendar: FSCalendar, didChangeSelection change: SelectionChange)
     func calendarCurrentPageDidChange(_ calendar: FSCalendar)
     func calendar(_ calendar: FSCalendar, didChangeDisplayMode mode: CalendarDisplayMode)
+    /// Update the height constraint and call the container's `layoutIfNeeded()` synchronously.
+    /// Animated changes arrive inside the calendar's animation context; do not start a second animation.
+    /// Interactive dragging and nonanimated changes arrive with `animated == false`.
     func calendar(_ calendar: FSCalendar, preferredHeightDidChange height: CGFloat, animated: Bool)
 }
 public extension FSCalendarDelegate {

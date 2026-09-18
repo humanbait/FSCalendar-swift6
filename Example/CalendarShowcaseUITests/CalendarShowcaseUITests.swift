@@ -25,6 +25,35 @@ final class CalendarShowcaseUITests: XCTestCase {
             }
         }
     }
+    @MainActor func testAnimationParity() {
+        XCTContext.runActivity(named: "\(implementation): selection and scope") { _ in
+            let app = launch("scope")
+            day(app, "2024-02-14").tap()
+            wait(app.staticTexts["selection-state"], contains: "2024-02-14")
+            app.buttons["scope"].tap()
+            wait(app.staticTexts["page-state"], contains: "week")
+            app.buttons["scope"].tap()
+            wait(app.staticTexts["page-state"], contains: "month")
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "\(implementation)-scope-restored"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        XCTContext.runActivity(named: "\(implementation): variable month height") { _ in
+            let app = launch("dynamicHeight")
+            XCTAssertTrue(day(app, "2024-02-14").isHittable)
+            app.buttons["next"].tap()
+            wait(app.staticTexts["page-state"], contains: "2024-03")
+            app.buttons["previous"].tap()
+            wait(app.staticTexts["page-state"], contains: "2024-02")
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            XCTAssertTrue(day(app, "2024-02-14").isHittable)
+            screenshot.name = "\(implementation)-variable-restored"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+    }
+
     @MainActor private func launch(_ scenario: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--scenario", scenario, "--implementation", implementation]

@@ -30,6 +30,174 @@ import FSCalendarCore
 extension FSCalendar: RendererSelectionContract {}
 
 final class CalendarViewTests: XCTestCase {
+    @MainActor private func hostForAnimation(_ calendar: FSCalendar) -> (UIWindow, CalendarSpy) {
+        let window: UIWindow
+        if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+            window = UIWindow(windowScene: scene)
+        } else { window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844)) }
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let controller = UIViewController()
+        window.rootViewController = controller
+        controller.view.addSubview(calendar)
+        calendar.translatesAutoresizingMaskIntoConstraints = false
+        let height = calendar.heightAnchor.constraint(equalToConstant: calendar.preferredHeight)
+        NSLayoutConstraint.activate([height, calendar.topAnchor.constraint(equalTo: controller.view.topAnchor, constant: 100),
+            calendar.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor),
+            calendar.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor)])
+        let spy = CalendarSpy()
+        spy.onHeight = { [weak calendar, weak controller] in
+            guard let calendar else { return }
+            height.constant = calendar.preferredHeight
+            controller?.view.layoutIfNeeded()
+        }
+        calendar.delegate = spy
+        window.makeKeyAndVisible(); controller.view.layoutIfNeeded()
+        return (window, spy)
+    }
+
+    @MainActor private func waitUntil(_ description: String, _ condition: @escaping @MainActor () -> Bool) {
+        let predicate = NSPredicate { _, _ in MainActor.assumeIsolated { condition() } }
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: nil)
+        expectation.expectationDescription = description
+        wait(for: [expectation], timeout: 3)
+    }
+
+    @MainActor func testSelectionBounceOnlyForAcceptedAdditionsAndClearsOnReuse() throws {
+        let view = try make(.multiple)
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        let cell = try XCTUnwrap(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.first { $0.dayState?.occurrence.day == day })
+        try view.select(day)
+        let bounce = try XCTUnwrap(cell.selectionBackground.layer.animation(forKey: "selectionBounce") as? CAKeyframeAnimation)
+        XCTAssertEqual(bounce.duration, 0.15)
+        XCTAssertEqual(bounce.values as? [Double], [0.3, 1.2, 1])
+        XCTAssertEqual(bounce.keyTimes, [0, 0.75, 1])
+        cell.selectionBackground.layer.removeAnimation(forKey: "selectionBounce")
+        view.reload(dates: [day]); try view.select(day)
+        XCTAssertNil(cell.selectionBackground.layer.animation(forKey: "selectionBounce"))
+        try view.deselect(day)
+        spy.allow = false
+        XCTAssertThrowsError(try view.select(day))
+        XCTAssertNil(cell.selectionBackground.layer.animation(forKey: "selectionBounce"))
+        spy.allow = true
+        try view.transact([day], origin: .user)
+        XCTAssertNotNil(cell.selectionBackground.layer.animation(forKey: "selectionBounce"))
+        try view.deselect(day)
+        XCTAssertNil(cell.selectionBackground.layer.animation(forKey: "selectionBounce"))
+        try view.select(day)
+        cell.prepareForReuse()
+        XCTAssertNil(cell.selectionBackground.layer.animation(forKey: "selectionBounce"))
+        XCTAssertEqual(cell.alpha, 1)
+    }
+
+    @MainActor func testScopeDragCoordinatesHeightOffsetAndOpacityInBothDirections() throws {
+        let view = try make()
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        try view.select(CivilDay(year: 2024, month: 2, day: 14))
+        for target in [CalendarDisplayMode.week, .month(.horizontal)] {
+            try view.beginInteractiveTransition(to: target)
+            let context = try XCTUnwrap(view.transition)
+            for progress: CGFloat in [0, 0.25, 0.75, 1] {
+                view.updateInteractiveTransition(progress: progress)
+                XCTAssertEqual(view.bounds.height, context.sourceHeight + (context.targetHeight - context.sourceHeight) * progress, accuracy: 0.5)
+                let ratio = target == .week ? progress : 1 - progress
+                XCTAssertEqual(view.collectionView.transform.ty, -context.rowOffset * ratio, accuracy: 0.01)
+                for cell in view.collectionView.visibleCells {
+                    let index = try XCTUnwrap(view.collectionView.indexPath(for: cell))
+                    let expected: CGFloat = index.item / 7 == context.focusedRow ? 1 : (target == .week ? max(1 - 1.1 * progress, 0) : progress)
+                    XCTAssertEqual(cell.alpha, expected, accuracy: 0.01)
+                }
+            }
+            view.finishInteractiveTransition(commit: true, animated: false)
+            XCTAssertTrue(view.collectionView.visibleCells.allSatisfy { $0.alpha == 1 })
+            XCTAssertEqual(view.collectionView.transform, .identity)
+        }
+        XCTAssertFalse(spy.heights.isEmpty)
+    }
+
+    @MainActor func testAnimatedScopeCommitAndCancellationPreserveIntermediateGeometry() throws {
+        let view = try make()
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        let monthHeight = view.preferredHeight
+        try view.beginInteractiveTransition(to: .week)
+        view.updateInteractiveTransition(progress: 0.6)
+        let dragHeight = view.preferredHeight
+        view.finishInteractiveTransition(commit: false, animated: true)
+        XCTAssertEqual(view.transition?.animator?.duration, 0.3)
+        waitUntil("Cancellation animates through intermediate height") {
+            guard let height = view.layer.presentation()?.bounds.height else { return false }
+            return height > dragHeight + 0.1 && height < monthHeight - 0.1
+        }
+        waitUntil("Cancellation finishes") { view.transitionState == .idle }
+        XCTAssertEqual(view.bounds.height, monthHeight, accuracy: 0.5)
+        XCTAssertEqual(view.displayMode, .month(.horizontal))
+        try view.setDisplayMode(.week, animated: true)
+        waitUntil("Scope commit finishes") { view.transitionState == .idle }
+        XCTAssertEqual(view.displayMode, .week)
+        XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
+        XCTAssertFalse(spy.heights.isEmpty)
+    }
+
+    @MainActor func testVariableMonthHeightAnimatesAndRapidReversalEndsAtLatestPage() throws {
+        let view = try make()
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        let shortHeight = view.preferredHeight
+        try view.setCurrentPage(CivilDay(year: 2024, month: 3, day: 1), animated: true)
+        let tallHeight = view.preferredHeight
+        waitUntil("Month height animates between endpoints") {
+            guard let height = view.layer.presentation()?.bounds.height else { return false }
+            return height > shortHeight + 0.1 && height < tallHeight - 0.1
+        }
+        try view.setCurrentPage(CivilDay(year: 2024, month: 2, day: 1), animated: true)
+        waitUntil("Reversal reaches the latest height") {
+            guard let height = view.layer.presentation()?.bounds.height else { return false }
+            return abs(height - shortHeight) < 0.1
+        }
+        XCTAssertEqual(view.currentPage, try CivilDay(year: 2024, month: 2, day: 1))
+        XCTAssertEqual(view.bounds.height, shortHeight, accuracy: 0.5)
+        XCTAssertEqual(spy.heights.last, shortHeight)
+    }
+
+    @MainActor func testReduceMotionSkipsSelectionScopeAndMonthHeightAnimations() throws {
+        let view = try make()
+        view.reduceMotionOverride = true
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        try view.select(day)
+        let cell = try XCTUnwrap(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.first { $0.dayState?.occurrence.day == day })
+        XCTAssertNil(cell.selectionBackground.layer.animation(forKey: "selectionBounce"))
+        try view.setCurrentPage(CivilDay(year: 2024, month: 3, day: 1), animated: true)
+        XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
+        XCTAssertNil(view.layer.animation(forKey: "bounds.size"))
+        try view.setDisplayMode(.week, animated: true)
+        XCTAssertEqual(view.transitionState, .idle)
+        XCTAssertEqual(view.displayMode, .week)
+        XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
+        XCTAssertFalse(spy.heights.isEmpty)
+    }
+
+    @MainActor func testNonanimatedAndSameHeightPageChangesDoNotAnimateHeight() throws {
+        let view = try make()
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        view.notifyHeight(animated: false)
+        let height = view.preferredHeight
+        try view.setCurrentPage(CivilDay(year: 2024, month: 3, day: 1), animated: true)
+        XCTAssertEqual(spy.heights, [height])
+        XCTAssertNil(view.layer.animation(forKey: "bounds.size"))
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        try view.setCurrentPage(CivilDay(year: 2024, month: 2, day: 1), animated: false)
+        XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
+        XCTAssertNil(view.layer.animation(forKey: "bounds.size"))
+    }
+
     @MainActor func testHeightNotificationsTrackDelegateIdentityAndPreventReentrantDuplicates() throws {
         let view = try make()
         let first = CalendarSpy(), second = CalendarSpy()

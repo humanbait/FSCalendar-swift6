@@ -13,6 +13,8 @@ import FSCalendarCore
     public weak var dataSource: (any FSCalendarDataSource)? { didSet { reloadData() } }
     public var appearance = FSCalendarAppearance() { didSet { refreshAppearance() } }
     var resolvedAppearance = FSCalendarAppearance()
+    var reduceMotionOverride: Bool?
+    var reduceMotion: Bool { reduceMotionOverride ?? UIAccessibility.isReduceMotionEnabled }
     public var today: CivilDay? { didSet { reload(dates: Set([oldValue, today].compactMap { $0 })) } }
     public var swipeSelectionEnabled = false { didSet { selectionGesture.isEnabled = swipeSelectionEnabled } }
     public var scopeGestureEnabled = true { didSet { updateGestureAvailability() } }
@@ -106,12 +108,13 @@ import FSCalendarCore
         guard !isMutating else { throw CalendarError.reentrantMutation }
         let section = try engine.sectionIndex(for: day, scope: mode.scope)
         cancelTransition()
+        layoutIfNeeded()
+        let previousHeight = preferredHeight
         let next = try engine.page(at: section, scope: mode.scope).anchor
         let changed = page != next
         page = next; needsPagePosition = false
-        updateHeader(); notifyHeight(animated: animated)
-        setNeedsLayout(); layoutIfNeeded()
-        collectionView.setContentOffset(calendarLayout.offset(for: section), animated: animated && !UIAccessibility.isReduceMotionEnabled)
+        updateHeader(); updatePageHeight(from: previousHeight, animated: animated)
+        collectionView.setContentOffset(calendarLayout.offset(for: section), animated: animated && !reduceMotion)
         if changed { delegate?.calendarCurrentPageDidChange(self) }
     }
     public func setCurrentPage(_ date: Date, animated: Bool = false) throws {
@@ -138,6 +141,12 @@ import FSCalendarCore
         guard delegate?.calendar(self, shouldApply: change) ?? true else { throw CalendarError.selectionVetoed }
         selection.commit(change)
         reload(dates: Set(change.added + change.removed))
+        let added = Set(change.added)
+        for case let cell as FSCalendarCell in collectionView.visibleCells {
+            if let day = cell.dayState?.occurrence.day, added.contains(day) {
+                cell.animateSelection(reduceMotion: reduceMotion)
+            }
+        }
         delegate?.calendar(self, didChangeSelection: change)
     }
     public func register(_ cellClass: FSCalendarCell.Type, forCellReuseIdentifier identifier: String) throws {
@@ -169,7 +178,8 @@ import FSCalendarCore
              (abs(bounds.height - lastBoundsSize.height) > 0.5 && abs(bounds.height - preferredHeight) > 1)) {
             cancelTransition()
         }
-        let sizeChanged = bounds.size != lastBoundsSize
+        let needsRepositionForSize = bounds.width != lastBoundsSize.width ||
+            (bounds.height != lastBoundsSize.height && !renderingMode.isHorizontal)
         lastBoundsSize = bounds.size
         let headerHeight = renderingMode.isContinuous ? 0 : effectiveHeaderHeight
         titleLabel.frame = CGRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
@@ -183,7 +193,7 @@ import FSCalendarCore
         let isRTL = effectiveUserInterfaceLayoutDirection == .rightToLeft
         if calendarLayout.isRTL != isRTL { updateWeekdays(); needsPagePosition = true }
         calendarLayout.isRTL = isRTL
-        if needsPagePosition || sizeChanged {
+        if needsPagePosition || needsRepositionForSize {
             let renderedPage = transition?.renderPage ?? page
             if let section = try? engine.sectionIndex(for: renderedPage, scope: renderingMode.scope) {
                 collectionView.layoutIfNeeded()
@@ -310,6 +320,7 @@ import FSCalendarCore
             // A prefetched cell may have been configured before the latest selection or content update.
             configure(cell, occurrence: occurrence)
             synchronizeSelection(at: indexPath, day: occurrence.day)
+            applyTransitionOpacity(to: cell, at: indexPath)
         }
     }
     func synchronizeSelection(at index: IndexPath, day: CivilDay) {
@@ -340,7 +351,8 @@ import FSCalendarCore
         guard !isLayingOut, !needsPagePosition, transition == nil, collectionView.bounds.width > 0 else { return }
         let section = calendarLayout.section(at: collectionView.contentOffset)
         guard let next = try? engine.page(at: section, scope: mode.scope).anchor, next != page else { return }
-        page = next; updateHeader(); notifyHeight(animated: true)
+        let previousHeight = preferredHeight
+        page = next; updateHeader(); updatePageHeight(from: previousHeight, animated: true)
         delegate?.calendarCurrentPageDidChange(self)
     }
     func updateGestureAvailability() {

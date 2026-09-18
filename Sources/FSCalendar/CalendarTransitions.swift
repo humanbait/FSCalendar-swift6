@@ -13,6 +13,9 @@ import FSCalendarCore
     let targetHeight: CGFloat
     let renderGridHeight: CGFloat
     var progress: CGFloat = 0
+    var focusedRow = 0
+    var rowOffset: CGFloat = 0
+    var changesScope: Bool { sourceMode.scope != targetMode.scope && !sourceMode.isContinuous && !targetMode.isContinuous }
     var animator: UIViewPropertyAnimator?
     var snapshot: UIView?
     init(sourceMode: CalendarDisplayMode, targetMode: CalendarDisplayMode, sourcePage: CivilDay,
@@ -30,7 +33,7 @@ extension FSCalendar {
         guard !isMutating else { throw CalendarError.reentrantMutation }
         cancelTransition()
         guard target != mode else { return }
-        if !animated || UIAccessibility.isReduceMotionEnabled {
+        if !animated || reduceMotion {
             let anchor = transitionAnchor()
             mode = target
             if case .month(let axis) = target { lastMonthAxis = axis }
@@ -75,43 +78,63 @@ extension FSCalendar {
         if let grid = try? engine.grid(containing: renderedPage, scope: .month), let index = engine.index(of: anchor, in: grid) {
             row = index / 7
         } else { row = 0 }
-        let offset = CGFloat(row) * effectiveRowHeight
-        let start = changesScope && mode.scope == .week ? CGAffineTransform(translationX: 0, y: -offset) : .identity
-        let end = changesScope && target.scope == .week ? CGAffineTransform(translationX: 0, y: -offset) : .identity
-        collectionView.transform = start
-        let animator = UIViewPropertyAnimator(duration: 0.3, dampingRatio: 1) { [weak self, weak context] in
-            self?.collectionView.transform = end
-            context?.snapshot?.alpha = 0
+        context.focusedRow = row
+        context.rowOffset = CGFloat(row) * effectiveRowHeight
+        applyTransitionProgress(0, context: context, animated: false, notify: false)
+    }
+    func applyTransitionOpacity(to cell: UICollectionViewCell, at index: IndexPath) {
+        guard let context = transition, context.changesScope else { cell.alpha = 1; return }
+        let opacity = context.targetMode.scope == .week ? max(1 - context.progress * 1.1, 0) : context.progress
+        cell.alpha = index.item / 7 == context.focusedRow ? 1 : opacity
+    }
+    private func applyTransitionProgress(_ progress: CGFloat, context: CalendarTransition, animated: Bool, notify: Bool = true) {
+        context.progress = progress
+        if context.changesScope {
+            let ratio = context.targetMode.scope == .week ? progress : 1 - progress
+            collectionView.transform = CGAffineTransform(translationX: 0, y: -context.rowOffset * ratio)
+            for cell in collectionView.visibleCells {
+                if let index = collectionView.indexPath(for: cell) { applyTransitionOpacity(to: cell, at: index) }
+            }
         }
-        context.animator = animator
-        animator.startAnimation(); animator.pauseAnimation(); animator.fractionComplete = 0
+        context.snapshot?.alpha = 1 - progress
+        if notify { notifyHeight(animated: animated) }
+        setNeedsLayout(); layoutIfNeeded()
     }
     public func updateInteractiveTransition(progress: CGFloat) {
         guard let context = transition, transitionPhase == .interactive else { return }
-        context.progress = min(1, max(0, progress.isFinite ? progress : 0))
-        context.animator?.fractionComplete = context.progress
-        notifyHeight(animated: false); setNeedsLayout(); layoutIfNeeded()
+        applyTransitionProgress(min(1, max(0, progress.isFinite ? progress : 0)), context: context, animated: false)
     }
     public func finishInteractiveTransition(commit: Bool, animated: Bool = true) {
-        guard let context = transition else { return }
+        guard let context = transition, transitionPhase == .interactive else { return }
         transitionPhase = .settling
-        guard animated, !UIAccessibility.isReduceMotionEnabled, let animator = context.animator else {
-            context.animator?.stopAnimation(true)
+        guard animated, !reduceMotion else {
             completeTransition(context, commit: commit)
             return
         }
-        animator.isReversed = !commit
-        animator.addAnimations { [weak self, weak context] in
+        // Capture height, focused-row movement and fading together, from the current drag position.
+        let animator = UIViewPropertyAnimator(duration: 0.3, curve: .easeInOut) { [weak self, weak context] in
             guard let self, let context, self.transition === context else { return }
-            context.progress = commit ? 1 : 0
-            self.notifyHeight(animated: true)
-            self.setNeedsLayout(); self.layoutIfNeeded()
+            self.applyTransitionProgress(commit ? 1 : 0, context: context, animated: true)
         }
+        context.animator = animator
         animator.addCompletion { [weak self, weak context] _ in
             guard let self, let context, self.transition === context else { return }
             self.completeTransition(context, commit: commit)
         }
-        animator.continueAnimation(withTimingParameters: nil, durationFactor: 1)
+        animator.startAnimation()
+    }
+    func updatePageHeight(from previousHeight: CGFloat, animated: Bool) {
+        let shouldAnimate = animated && !reduceMotion &&
+            !mode.isContinuous && previousHeight != preferredHeight
+        let update = {
+            self.notifyHeight(animated: shouldAnimate)
+            self.setNeedsLayout(); self.layoutIfNeeded()
+        }
+        if shouldAnimate {
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState, .allowUserInteraction], animations: update)
+        } else {
+            UIView.performWithoutAnimation(update)
+        }
     }
     func completeTransition(_ context: CalendarTransition, commit: Bool) {
         guard transition === context else { return }
@@ -119,6 +142,7 @@ extension FSCalendar {
         transition = nil; transitionPhase = .idle
         context.snapshot?.removeFromSuperview()
         collectionView.transform = .identity; collectionView.isScrollEnabled = true
+        collectionView.visibleCells.forEach { $0.alpha = 1 }
         mode = commit ? context.targetMode : context.sourceMode
         page = commit ? context.targetPage : context.sourcePage
         if case .month(let axis) = mode { lastMonthAxis = axis }

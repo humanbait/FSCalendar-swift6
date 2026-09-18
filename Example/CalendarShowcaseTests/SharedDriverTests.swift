@@ -104,6 +104,11 @@ final class SharedDriverTests: XCTestCase {
                 XCTAssertEqual(driver.state.scope, scenario == .week ? "week" : "month", "\(implementation)/\(scenario)")
                 XCTAssertTrue(DemoFixtures.text(driver.state.page).hasPrefix("2024-02"), "\(implementation)/\(scenario): \(driver.state.page)")
                 XCTAssertTrue(driver.state.selection.isEmpty)
+                func containsFixtureDay(_ view: UIView) -> Bool {
+                    if view.accessibilityIdentifier?.hasPrefix("day.2024-02-14.1.") == true { return true }
+                    return view.subviews.contains(where: containsFixtureDay)
+                }
+                XCTAssertTrue(containsFixtureDay(driver.view), "Missing visible fixture day: \(implementation)/\(scenario)")
             }
         }
     }

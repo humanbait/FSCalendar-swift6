@@ -51,12 +51,8 @@ final class LegacyCalendarDriver: NSObject, UIKitCalendarDemoDriver, @preconcurr
             calendar.appearance.headerTitleFont = .systemFont(ofSize: 25, weight: .semibold)
         }
         if [.custom, .range].contains(scenario) { calendar.register(DemoLegacyCell.self, forCellReuseIdentifier: "custom") }
-        // Legacy scope and continuous scrolling need a valid layout before positioning the fixture.
-        calendar.layoutIfNeeded()
-        if scenario == .continuous {
-            // Legacy updates the visible continuous month only after attachment to a window.
-            calendar.onInitialWindowLayout = { [weak self] in self?.reset() }
-        }
+        // Initialize legacy's visible page only after the container supplies its final geometry.
+        calendar.onInitialWindowLayout = { [weak self] in self?.reset() }
         reset()
     }
 

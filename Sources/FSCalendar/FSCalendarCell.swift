@@ -32,6 +32,9 @@ import FSCalendarCore
         isAccessibilityElement = true
     }
     open func apply(content: DayContent, state: DayState, appearance: FSCalendarAppearance, style: DayAppearance) {
+        if !state.isSelected || dayState?.occurrence.id != state.occurrence.id {
+            selectionBackground.layer.removeAnimation(forKey: "selectionBounce")
+        }
         dayState = state
         isHidden = state.occurrence.isHidden
         isSelected = state.isSelected
@@ -90,8 +93,19 @@ import FSCalendarCore
         for dot in eventStack.arrangedSubviews { dot.layer.cornerRadius = dotHeight / 2 }
         selectionBackground.layer.cornerRadius = radius ?? min(selectionBackground.bounds.width, selectionBackground.bounds.height) / 2
     }
+    func animateSelection(reduceMotion: Bool) {
+        guard !reduceMotion, window != nil, dayState?.isSelected == true else { return }
+        let bounce = CAKeyframeAnimation(keyPath: "transform.scale")
+        bounce.values = [0.3, 1.2, 1.0]
+        bounce.keyTimes = [0, 0.75, 1]
+        bounce.duration = 0.15
+        selectionBackground.layer.add(bounce, forKey: "selectionBounce")
+    }
+
     open override func prepareForReuse() {
         super.prepareForReuse()
+        selectionBackground.layer.removeAnimation(forKey: "selectionBounce")
+        alpha = 1
         dayState = nil; titleLabel.text = nil; subtitleLabel.text = nil; dayImageView.image = nil
         accessibilityLabel = nil; accessibilityValue = nil; accessibilityIdentifier = nil
         isHidden = false; isSelected = false
