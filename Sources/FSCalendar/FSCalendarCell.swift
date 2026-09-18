@@ -67,7 +67,9 @@ import FSCalendarCore
         let hasImage = dayImageView.image != nil
         let textHeight = min(titleLabel.font.lineHeight, bounds.height * (hasSubtitle || hasImage ? 0.45 : 0.7))
         let subtitleHeight = hasSubtitle ? min(subtitleLabel.font.lineHeight, bounds.height * 0.25) : 0
-        let top = max(1, (bounds.height - textHeight - subtitleHeight - 8) / 2)
+        // Match the legacy cell: text and shape share the upper five-sixths.
+        let contentHeight = bounds.height * 5 / 6
+        let top = (contentHeight - textHeight - subtitleHeight) / 2
         let imageSpace: CGFloat = hasImage ? 16 : 0
         let imageOnLeft = effectiveUserInterfaceLayoutDirection == .rightToLeft
         titleLabel.frame = CGRect(x: 2 + (imageOnLeft ? imageSpace : 0), y: top,
@@ -77,9 +79,15 @@ import FSCalendarCore
                                     width: 12, height: hasImage ? min(12, textHeight) : 0)
         let dotCount = eventStack.arrangedSubviews.filter { !$0.isHidden }.count
         let dotWidth = CGFloat(max(0, dotCount * 7 - 3))
-        eventStack.frame = CGRect(x: (bounds.width - dotWidth) / 2, y: bounds.height - 7, width: dotWidth, height: 4)
-        let side = max(0, min(bounds.width - 4, bounds.height - 4))
-        selectionBackground.frame = CGRect(x: (bounds.width - side) / 2, y: (bounds.height - side) / 2, width: side, height: side)
+        let standardDiameter: CGFloat = 100 / 3
+        let availableDiameter = max(0, min(bounds.width, contentHeight))
+        let side = availableDiameter - max(0, availableDiameter - standardDiameter) / 2
+        selectionBackground.frame = CGRect(x: (bounds.width - side) / 2, y: (contentHeight - side) / 2, width: side, height: side)
+        let eventSize = side / 6
+        let dotHeight = min(4, eventSize * 0.83)
+        let dotY = selectionBackground.frame.maxY + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
+        eventStack.frame = CGRect(x: (bounds.width - dotWidth) / 2, y: dotY, width: dotWidth, height: dotHeight)
+        for dot in eventStack.arrangedSubviews { dot.layer.cornerRadius = dotHeight / 2 }
         selectionBackground.layer.cornerRadius = radius ?? min(selectionBackground.bounds.width, selectionBackground.bounds.height) / 2
     }
     open override func prepareForReuse() {

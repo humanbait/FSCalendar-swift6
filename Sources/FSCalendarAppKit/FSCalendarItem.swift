@@ -54,19 +54,28 @@ import FSCalendarCore
     }
     open override func viewDidLayout() {
         super.viewDidLayout()
-        let size = view.bounds.size, titleHeight = (titleLabel.font?.pointSize ?? 15) + 4
-        let subtitleHeight = (subtitleLabel.font?.pointSize ?? 10) + 3
-        let diameter = min(size.width - 4, size.height - 4)
-        selectionBackground.frame = NSRect(x: (size.width - diameter) / 2, y: (size.height - diameter) / 2, width: diameter, height: diameter)
+        let size = view.bounds.size
+        let titleHeight = titleLabel.intrinsicContentSize.height
+        let subtitleHeight = subtitleLabel.stringValue.isEmpty ? 0 : subtitleLabel.intrinsicContentSize.height
+        // Match the legacy cell: text and shape share the upper five-sixths.
+        let contentHeight = size.height * 5 / 6
+        let standardDiameter: CGFloat = 100 / 3
+        let availableDiameter = max(0, min(size.width, contentHeight))
+        let diameter = availableDiameter - max(0, availableDiameter - standardDiameter) / 2
+        selectionBackground.frame = NSRect(x: (size.width - diameter) / 2, y: (contentHeight - diameter) / 2, width: diameter, height: diameter)
         selectionBackground.layer?.cornerRadius = radius ?? max(0, diameter / 2)
-        let top = max(2, (size.height - titleHeight - (subtitleLabel.stringValue.isEmpty ? 0 : subtitleHeight) - 8) / 2)
+        let top = (contentHeight - titleHeight - subtitleHeight) / 2
         let imageWidth: CGFloat = dayImageView.image == nil ? 0 : 16
         titleLabel.frame = NSRect(x: 2, y: top, width: size.width - imageWidth - 4, height: titleHeight)
         dayImageView.frame = NSRect(x: size.width - 19, y: top + 1, width: imageWidth, height: 14)
         subtitleLabel.frame = NSRect(x: 2, y: top + titleHeight, width: size.width - 4, height: subtitleHeight)
+        let eventSize = diameter / 6
+        let dotHeight = min(4, eventSize * 0.83)
+        let dotY = selectionBackground.frame.maxY + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
         let count = dots.filter { !$0.isHidden }.count
         for (index, dot) in dots.enumerated() {
-            dot.frame = NSRect(x: size.width / 2 - CGFloat(count * 7 - 3) / 2 + CGFloat(index * 7), y: size.height - 7, width: 4, height: 4)
+            dot.frame = NSRect(x: size.width / 2 - CGFloat(count * 7 - 3) / 2 + CGFloat(index * 7), y: dotY, width: 4, height: dotHeight)
+            dot.layer?.cornerRadius = dotHeight / 2
         }
     }
     open override func prepareForReuse() {

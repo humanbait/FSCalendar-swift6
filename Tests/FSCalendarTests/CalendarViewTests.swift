@@ -24,6 +24,44 @@ import FSCalendarCore
 extension FSCalendar: RendererSelectionContract {}
 
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testLegacyCellContentAlignment() throws {
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        let engine = try CalendarEngine(configuration: CalendarConfiguration())
+        let occurrence = try XCTUnwrap(engine.grid(containing: day, scope: .month).occurrences.first { $0.day == day })
+        let cell = FSCalendarCell(frame: .zero)
+        for (size, expectedDiameter) in [(CGSize(width: 116, height: 44), CGFloat(35)), (CGSize(width: 70, height: 60), CGFloat(125) / 3), (CGSize(width: 28, height: 32), CGFloat(80) / 3)] {
+            cell.frame = CGRect(origin: .zero, size: size)
+            for events in [0, 3] {
+                for subtitle in [nil, "Lunar"] as [String?] {
+                    for hasImage in [false, true] {
+                        for stateFlags in [(false, false), (true, false), (false, true)] {
+                            cell.apply(content: DayContent(subtitle: subtitle, image: hasImage ? UIImage(systemName: "heart.fill") : nil, numberOfEvents: events),
+                                       state: DayState(occurrence: occurrence, isSelected: stateFlags.0, isToday: stateFlags.1),
+                                       appearance: FSCalendarAppearance(), style: DayAppearance(cornerRadius: 7))
+                            cell.setNeedsLayout(); cell.layoutIfNeeded()
+                            let textFrame = subtitle == nil ? cell.titleLabel.frame : cell.titleLabel.frame.union(cell.subtitleLabel.frame)
+                            XCTAssertEqual(cell.selectionBackground.frame.width, expectedDiameter, accuracy: 0.5)
+                            XCTAssertEqual(textFrame.midY, cell.selectionBackground.frame.midY, accuracy: 0.5)
+                            XCTAssertEqual(cell.selectionBackground.frame.midY, size.height * 5 / 12, accuracy: 0.5)
+                            if !hasImage { XCTAssertEqual(cell.titleLabel.frame.midX, size.width / 2, accuracy: 0.5) }
+                            XCTAssertEqual(cell.selectionBackground.layer.cornerRadius, 7)
+                            let stack = try XCTUnwrap(cell.contentView.subviews.compactMap { $0 as? UIStackView }.first)
+                            XCTAssertEqual(stack.isHidden, events == 0)
+                            if events > 0 { XCTAssertGreaterThan(stack.frame.minY, cell.selectionBackground.frame.maxY) }
+                        }
+                    }
+                }
+            }
+        }
+        cell.prepareForReuse()
+        cell.apply(content: DayContent(), state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
+                   appearance: FSCalendarAppearance(), style: DayAppearance())
+        cell.setNeedsLayout(); cell.layoutIfNeeded()
+        XCTAssertNil(cell.dayImageView.image)
+        XCTAssertEqual(cell.titleLabel.frame.midY, cell.selectionBackground.frame.midY, accuracy: 0.5)
+        XCTAssertEqual(cell.selectionBackground.frame.width, 80 / 3, accuracy: 0.5)
+    }
+
     @MainActor func testSharedSelectionContract() throws {
         let view = try make(); let spy = CalendarSpy(); view.delegate = spy
         try SharedRendererAssertions.verifySelection(view, changes: { spy.changes }, allow: { spy.allow = $0 })
