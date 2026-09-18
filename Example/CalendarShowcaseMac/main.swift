@@ -5,8 +5,9 @@ import FSCalendarAppKit
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     func applicationDidFinishLaunching(_ notification: Notification) {
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 750),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1080, height: 820),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        window.minSize = NSSize(width: 880, height: 620)
         window.title = "FSCalendar — AppKit"
         window.identifier = NSUserInterfaceItemIdentifier("showcase.window")
         window.contentViewController = ShowcaseController()

@@ -54,6 +54,7 @@ import FSCalendarCore
         collectionView.setAccessibilityIdentifier("calendar-grid")
         scrollView.hasHorizontalScroller = true; scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true; scrollView.scrollerStyle = .overlay
+        scrollView.setAccessibilityIdentifier("calendar.scroll")
         scrollView.documentView = collectionView
         scrollView.drawsBackground = false; scrollView.borderType = .noBorder
         addSubview(scrollView); addSubview(titleLabel)
@@ -168,6 +169,11 @@ import FSCalendarCore
         default: super.keyDown(with: event)
         }
     }
+    public func register(_ itemClass: FSCalendarItem.Type, forItemReuseIdentifier identifier: String) throws {
+        guard !identifier.isEmpty else { throw CalendarError.invalidConfiguration("Item reuse identifier must not be empty") }
+        controller.registered.insert(identifier)
+        collectionView.register(itemClass, forItemWithIdentifier: NSUserInterfaceItemIdentifier(identifier))
+    }
     public func reloadData() { controller.cache.removeAll(); controller.recency.removeAll(); collectionView.reloadData(); needsLayout = true }
     public func reload(dates: Set<CivilDay>) {
         for case let item as FSCalendarItem in collectionView.visibleItems() {
@@ -179,8 +185,10 @@ import FSCalendarCore
         if content.accessibilityLabel == nil {
             content.accessibilityLabel = (try? occurrence.day.date(in: configuration.timeZone)).map { formatter("EEEE, MMMM d, yyyy").string(from: $0) }
         }
+        item.view.effectiveAppearance.performAsCurrentDrawingAppearance {
         item.apply(content: content, state: DayState(occurrence: occurrence, isSelected: selection.contains(occurrence.day), isToday: occurrence.day == today),
             appearance: metrics, style: dataSource?.calendar(self, appearanceFor: occurrence.day) ?? DayAppearance())
+        }
         (item.view as? CalendarDayView)?.owner = self
         item.view.layer?.borderWidth = focusedDay == occurrence.day && window?.firstResponder === self ? 2 : 0
         item.view.layer?.borderColor = NSColor.keyboardFocusIndicatorColor.cgColor
@@ -217,7 +225,7 @@ import FSCalendarCore
             let weekday = (configuration.firstWeekday - 1 + (userInterfaceLayoutDirection == .rightToLeft ? 6 - column : column)) % 7
             label.stringValue = symbols[weekday]; label.setAccessibilityLabel(full[weekday]); label.font = appearance.weekdayFont
         }
-        layer?.backgroundColor = appearance.backgroundColor.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = appearance.backgroundColor.cgColor }
     }
     @objc private func scrolled() {
         guard mode.isContinuous, !isLayingOut, !needsPagePosition else { return }

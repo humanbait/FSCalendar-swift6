@@ -80,6 +80,11 @@ import FSCalendarCore
 }
 
 @MainActor final class CalendarCollectionView: NSCollectionView {
+    override func accessibilityChildren() -> [Any]? {
+        visibleItems().filter { !$0.view.isHidden && $0.view.frame.intersects(visibleRect) }
+            .sorted { ($0 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "" < ($1 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "" }
+            .map(\.view)
+    }
     override func setFrameSize(_ newSize: NSSize) {
         let content = collectionViewLayout?.collectionViewContentSize ?? .zero
         super.setFrameSize(NSSize(width: max(newSize.width, content.width), height: max(newSize.height, content.height)))
@@ -99,6 +104,7 @@ import FSCalendarCore
 @MainActor final class CalendarDayView: FlippedView {
     weak var owner: FSCalendarView?
     var day: CivilDay?
+    override func accessibilityChildren() -> [Any]? { [] }
     override func accessibilityFrame() -> NSRect {
         guard let window else { return .zero }
         return window.convertToScreen(convert(bounds, to: nil))

@@ -22,3 +22,10 @@ Milestone 4: horizontal/vertical months, horizontal weeks, continuous months wit
 headers, accumulated scrolling, RTL, backing-scale and live resize geometry. 26 package tests
 passed, including 192 navigation operations across four modes with detailed cache <= 9 pages.
 Mac hosted and input regression evidence: artifacts/mac-m4.xcresult.
+
+Milestone 5: all 18 native scenarios, shared fixtures/direct launch arguments, custom item registration
+and fallback, lunar subtitles/images/events, range example, explicit large fonts and dark appearance.
+28 package tests and the full Mac hosted/UI suite passed; the UI matrix selected, reloaded and reset
+a date on every scenario and retained screenshots. Evidence: artifacts/mac-m5-flat-accessibility.xcresult.
+The collection exposes visible day views directly in accessibility, avoiding AppKit's disabled
+intermediate section elements. Native nested-scroll hit testing also has a hosted regression check.

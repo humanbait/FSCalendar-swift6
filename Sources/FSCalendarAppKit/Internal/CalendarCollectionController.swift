@@ -22,7 +22,7 @@ import FSCalendarCore
         if let header = view as? CalendarMonthHeader, let owner, let page = try? owner.engine.page(at: indexPath.section, scope: .month) {
             header.label.stringValue = (try? page.anchor.date(in: owner.configuration.timeZone)).map { owner.formatter("LLLL yyyy").string(from: $0) } ?? page.anchor.description
             header.label.font = owner.metrics.headerFont; header.label.textColor = owner.metrics.headerColor
-            header.wantsLayer = true; header.layer?.backgroundColor = owner.metrics.backgroundColor.cgColor
+            header.wantsLayer = true; owner.effectiveAppearance.performAsCurrentDrawingAppearance { header.layer?.backgroundColor = owner.metrics.backgroundColor.cgColor }
             header.setAccessibilityIdentifier("month.\(page.anchor)")
         }
         return view
@@ -33,7 +33,10 @@ import FSCalendarCore
         return rows[section] * 7
     }
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
-        let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier("default"), for: indexPath)
+        let occurrence = grid(indexPath.section)?.occurrences[indexPath.item]
+        let requested = occurrence.flatMap { day in owner.flatMap { $0.dataSource?.calendar($0, reuseIdentifierFor: day.day) } } ?? "default"
+        let identifier = registered.contains(requested) ? requested : "default"
+        let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier(identifier), for: indexPath)
         if let item = item as? FSCalendarItem, let grid = grid(indexPath.section), grid.occurrences.indices.contains(indexPath.item) {
             owner?.configure(item, occurrence: grid.occurrences[indexPath.item])
         }
