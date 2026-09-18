@@ -18,7 +18,7 @@ import FSCalendarCore
     public var displayMode: CalendarDisplayMode { mode }
     public var preferredHeight: CGFloat { height(for: page) }
     public override var isFlipped: Bool { true }
-    public override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: preferredHeight) }
+    public override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: mode.isContinuous ? NSView.noIntrinsicMetric : preferredHeight) }
     public override var fittingSize: NSSize { NSSize(width: bounds.width, height: preferredHeight) }
     var selection = SelectionState()
     var isMutating = false
@@ -43,11 +43,14 @@ import FSCalendarCore
         wantsLayer = true
         today = try? CivilDay(date: Date(), timeZone: configuration.timeZone)
         page = engine.pageID(containing: clamped(today ?? configuration.minimumDate), scope: .month).anchor
-        controller.owner = self; input.owner = self
+        controller.owner = self; input.owner = self; scrollView.owner = self
         collectionView.autoresizingMask = []
         collectionView.collectionViewLayout = calendarLayout; collectionView.dataSource = controller; collectionView.delegate = controller
         collectionView.isSelectable = true; collectionView.allowsMultipleSelection = true; collectionView.backgroundColors = [.clear]
         collectionView.register(FSCalendarItem.self, forItemWithIdentifier: NSUserInterfaceItemIdentifier("default"))
+        collectionView.register(CalendarMonthHeader.self, forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader, withIdentifier: NSUserInterfaceItemIdentifier("month"))
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
         collectionView.setAccessibilityIdentifier("calendar-grid")
         scrollView.hasHorizontalScroller = true; scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true; scrollView.scrollerStyle = .overlay
@@ -58,6 +61,7 @@ import FSCalendarCore
         for label in weekdayLabels { label.alignment = .center; addSubview(label) }
         setAccessibilityIdentifier("calendar"); rebuild()
     }
+    deinit { NotificationCenter.default.removeObserver(self) }
     public func apply(configuration: CalendarConfiguration) throws {
         guard !isMutating else { throw CalendarError.reentrantMutation }
         let replacement = try CalendarEngine(configuration: configuration)
@@ -90,6 +94,24 @@ import FSCalendarCore
         let (next, overflow) = index.addingReportingOverflow(offset)
         guard !overflow else { throw CalendarError.invalidPageIndex(offset) }
         try setCurrentPage(engine.page(at: next, scope: mode.scope).anchor, animated: animated)
+    }
+    public func setDisplayMode(_ target: CalendarDisplayMode, animated: Bool = true) throws {
+        guard !isMutating else { throw CalendarError.reentrantMutation }
+        guard target != mode else { return }
+        let plan = transitionPlan(to: target), previous = page
+        mode = target; page = plan.destinationPage; reconcileFocus(); rebuild()
+        needsLayout = true; layoutSubtreeIfNeeded()
+        delegate?.calendar(self, didChangeDisplayMode: mode)
+        if page != previous { delegate?.calendarCurrentPageDidChange(self) }
+    }
+    func transitionPlan(to target: CalendarDisplayMode) -> CalendarTransitionPlan {
+        let visible = collectionView.visibleItems().compactMap { item -> CivilDay? in
+            guard item.view.frame.intersects(collectionView.visibleRect), let state = (item as? FSCalendarItem)?.dayState,
+                  !state.occurrence.isHidden else { return nil }
+            return state.occurrence.day
+        }
+        return CalendarTransitionPlan(engine: engine, currentPage: page, visibleDays: visible,
+            selectedDays: selectedDays, today: today, targetMode: target)
     }
     public func select(_ day: CivilDay) throws {
         try setSelection(configuration.selectionMode == .multiple ? selectedDays + [day] : [day])
@@ -173,6 +195,8 @@ import FSCalendarCore
     }
     func height(for day: CivilDay) -> CGFloat { metrics.headerHeight + metrics.weekdayHeight + CGFloat(rowCount(day)) * metrics.rowHeight }
     func rebuild() {
+        input.cancelScroll()
+        calendarLayout.mode = mode; calendarLayout.rowHeight = metrics.rowHeight; calendarLayout.headerHeight = metrics.headerHeight
         calendarLayout.rows = (0..<engine.pageCount(scope: mode.scope)).compactMap { try? engine.page(at: $0, scope: mode.scope) }.map { rowCount($0.anchor) }
         calendarLayout.invalidateLayout(); reloadData(); updateHeader(); notifyHeight(animated: false)
         needsPagePosition = true; needsLayout = true
@@ -195,6 +219,18 @@ import FSCalendarCore
         }
         layer?.backgroundColor = appearance.backgroundColor.cgColor
     }
+    @objc private func scrolled() {
+        guard mode.isContinuous, !isLayingOut, !needsPagePosition else { return }
+        let section = calendarLayout.section(at: scrollView.contentView.bounds.origin)
+        guard let next = try? engine.page(at: section, scope: .month).anchor, next != page else { return }
+        page = next; reconcileFocus(); updateHeader(); delegate?.calendarCurrentPageDidChange(self)
+    }
+    public override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties(); calendarLayout.rowHeight = metrics.rowHeight; needsPagePosition = true; needsLayout = true
+    }
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance(); updateHeader(); reload(dates: Set(collectionView.visibleItems().compactMap { ($0 as? FSCalendarItem)?.dayState?.occurrence.day }))
+    }
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow(); needsPagePosition = true; needsLayout = true
     }
@@ -202,16 +238,18 @@ import FSCalendarCore
         super.layout()
         guard !isLayingOut else { return }; isLayingOut = true; defer { isLayingOut = false }
         let appearance = metrics
-        titleLabel.frame = NSRect(x: 0, y: 0, width: bounds.width, height: appearance.headerHeight)
+        let headerHeight: CGFloat = mode.isContinuous ? 0 : appearance.headerHeight
+        titleLabel.isHidden = mode.isContinuous
+        titleLabel.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         for (index, label) in weekdayLabels.enumerated() {
-            label.frame = NSRect(x: CGFloat(index) * bounds.width / 7, y: appearance.headerHeight, width: bounds.width / 7, height: appearance.weekdayHeight)
+            label.frame = NSRect(x: CGFloat(index) * bounds.width / 7, y: headerHeight, width: bounds.width / 7, height: appearance.weekdayHeight)
         }
-        let top = appearance.headerHeight + appearance.weekdayHeight
+        let top = headerHeight + appearance.weekdayHeight
         scrollView.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(1, bounds.height - top))
         if calendarLayout.viewport != scrollView.contentSize || calendarLayout.isRTL != (userInterfaceLayoutDirection == .rightToLeft) {
             calendarLayout.viewport = scrollView.contentSize
             calendarLayout.isRTL = userInterfaceLayoutDirection == .rightToLeft
-            calendarLayout.invalidateLayout(); needsPagePosition = true
+            calendarLayout.invalidateLayout(); needsPagePosition = true; updateHeader()
         }
         if collectionView.frame.size != calendarLayout.collectionViewContentSize { collectionView.frame.size = calendarLayout.collectionViewContentSize }
         scrollView.layoutSubtreeIfNeeded()
@@ -222,6 +260,7 @@ import FSCalendarCore
             }
             needsPagePosition = false
         }
+        if lastSize != bounds.size { updateHeader() }
         lastSize = bounds.size
     }
 }

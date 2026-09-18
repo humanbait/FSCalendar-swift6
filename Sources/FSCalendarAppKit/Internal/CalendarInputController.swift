@@ -7,6 +7,40 @@ import FSCalendarCore
     var visited: Set<CivilDay> = []
     var removes = false
     var dragging = false
+    private var scrollTask: Task<Void, Never>?
+    private var scrollStart: NSPoint?
+    private var scrollDistance: CGFloat = 0
+    deinit { scrollTask?.cancel() }
+    func cancelScroll() { scrollTask?.cancel(); scrollTask = nil; scrollStart = nil; scrollDistance = 0 }
+    func accumulateScroll(_ delta: CGFloat, ended: Bool) {
+        guard let owner, !owner.displayMode.isContinuous, delta.isFinite else { return }
+        if scrollStart == nil { scrollStart = owner.scrollView.contentView.bounds.origin }
+        scrollDistance -= delta
+        var position = scrollStart ?? .zero
+        let horizontal = owner.displayMode.isHorizontal, content = owner.calendarLayout.collectionViewContentSize
+        if horizontal { position.x = max(0, min(content.width - owner.calendarLayout.viewport.width, position.x + scrollDistance)) }
+        else { position.y = max(0, min(content.height - owner.calendarLayout.viewport.height, position.y + scrollDistance)) }
+        owner.scrollView.contentView.scroll(to: position); owner.scrollView.reflectScrolledClipView(owner.scrollView.contentView)
+        scrollTask?.cancel()
+        if ended { settleScroll() }
+        else {
+            scrollTask = Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .milliseconds(140)) } catch { return }
+                self?.settleScroll()
+            }
+        }
+    }
+    func settleScroll() {
+        guard let owner, let start = scrollStart else { return }
+        let length = owner.displayMode.isHorizontal ? owner.calendarLayout.viewport.width : owner.calendarLayout.viewport.height
+        let startSection = owner.calendarLayout.section(at: start)
+        let direction = scrollDistance >= 0 ? 1 : -1
+        let rtl = owner.displayMode.isHorizontal && owner.userInterfaceLayoutDirection == .rightToLeft
+        let steps = abs(scrollDistance) >= min(60, length * 0.25) ? max(1, Int((abs(scrollDistance) / max(1, length)).rounded())) : 0
+        let index = min(owner.calendarLayout.rows.count - 1, max(0, startSection + steps * direction * (rtl ? -1 : 1)))
+        cancelScroll()
+        if let day = try? owner.engine.page(at: index, scope: owner.displayMode.scope).anchor { try? owner.setCurrentPage(day) }
+    }
     func begin(_ day: CivilDay) {
         guard let owner, owner.engine.isSelectable(day) else { return }
         owner.window?.makeFirstResponder(owner)
@@ -53,8 +87,13 @@ import FSCalendarCore
 }
 
 @MainActor final class CalendarScrollView: NSScrollView {
-    // Paged scrolling is handled by the calendar, never by NSScrollView's document-origin fallback.
-    override func scrollWheel(with event: NSEvent) {}
+    weak var owner: FSCalendarView?
+    override func scrollWheel(with event: NSEvent) {
+        guard let owner else { super.scrollWheel(with: event); return }
+        if owner.displayMode.isContinuous { super.scrollWheel(with: event); return }
+        let delta = owner.displayMode.isHorizontal && abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
+        owner.input.accumulateScroll(delta, ended: event.momentumPhase == .ended || event.phase == .cancelled)
+    }
 }
 
 @MainActor final class CalendarDayView: FlippedView {

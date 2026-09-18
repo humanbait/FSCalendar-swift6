@@ -17,3 +17,8 @@ configuration pruning, focus, mouse toggling, drag painting, keyboard activation
 24 package tests, 7 hosted checks and 2 UI checks passed. Actual clicks exposed a document-frame
 sizing bug; the native collection subclass now retains the custom layout's full content extent.
 Evidence: artifacts/mac-m3-document-fixed.xcresult.
+
+Milestone 4: horizontal/vertical months, horizontal weeks, continuous months with reusable sticky
+headers, accumulated scrolling, RTL, backing-scale and live resize geometry. 26 package tests
+passed, including 192 navigation operations across four modes with detailed cache <= 9 pages.
+Mac hosted and input regression evidence: artifacts/mac-m4.xcresult.
