@@ -1,5 +1,7 @@
 # FSCalendar — Swift 6
 
+A Swift 6 rewrite of [FSCalendar](https://github.com/WenchaoD/FSCalendar), originally created by Wenchao Deng and its contributors.
+
 Native UIKit and AppKit calendars with a shared Foundation date engine. Requires Swift 6.2 or later, Swift 6 language mode, and iOS 16+ or macOS 13+. The package contains no SwiftUI, networking, third-party runtime dependency, or Objective-C forwarding.
 
 | SwiftPM product | Contents |
@@ -7,6 +9,19 @@ Native UIKit and AppKit calendars with a shared Foundation date engine. Requires
 | `FSCalendarCore` | Civil dates, page/occurrence identities, Gregorian grids, inclusive bounds, ordered selection transactions |
 | `FSCalendar` | Main-actor UIKit view, custom collection layout, reusable cells, appearance, gestures, interactive transitions |
 | `FSCalendarAppKit` | Native AppKit view, reusable items, mouse/keyboard focus, all layout modes and cancellable transitions |
+
+## Relationship to the original FSCalendar
+
+This project builds on the ideas and behavior of [WenchaoD/FSCalendar](https://github.com/WenchaoD/FSCalendar), with redesigned Swift APIs and native macOS support.
+
+- **Swift 6:** Swift 6 language mode with main-actor-isolated UI APIs.
+- **iOS and macOS:** UIKit and AppKit renderers share the same date engine.
+- **Migration:** Existing integrations require API changes. See the [migration guide](Documentation/MIGRATION.md).
+- **Behavior comparison:** The development showcase includes an original FSCalendar 2.8.4 reference for side-by-side testing. The reference and its adapters are excluded from the distributed SwiftPM libraries.
+
+Release versions belong to this rewrite and do not correspond to upstream FSCalendar versions.
+
+## Installation and usage
 
 Add this directory as a local package in Xcode, or add its Git URL after publishing the repository. Link `FSCalendar` and `FSCalendarCore` to your UIKit app. For native Mac apps, link `FSCalendarAppKit` and `FSCalendarCore`; see the [AppKit integration guide](Documentation/APPKIT.md).
 
@@ -73,6 +88,10 @@ See [migration/customization](Documentation/MIGRATION.md), [contracts](Documenta
 
 Run `./script/build_and_run.sh`, or choose **CalendarShowcaseMac** in the checked-in Xcode project. All 18 scenarios use native AppKit controls and shared fixtures. Run `./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64'` for package, hosted and UI tests with artifacts and performance measurements. See [Mac validation](Documentation/MACOS-VALIDATION.md) for actual results and pending release gates.
 
-## License
+## License and acknowledgments
 
-MIT; see [LICENSE](LICENSE). The development reference retains original attribution and [source hashes](Development/Legacy/README.md). Legacy code and adapters are outside every distributed SwiftPM target. The upstream checkout was not modified.
+Distributed under the [MIT License](LICENSE).
+
+Thanks to Wenchao Deng and the contributors to [the original FSCalendar](https://github.com/WenchaoD/FSCalendar) for their work. The original copyright and license notice are preserved.
+
+See [the development reference notes](Development/Legacy/README.md) for the vendored reference's provenance and source hashes. The upstream checkout was not modified.
