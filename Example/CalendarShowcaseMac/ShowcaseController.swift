@@ -1,12 +1,17 @@
 import AppKit
 import CalendarDemoSupportMac
 import FSCalendarAppKit
+import FSCalendarCore
 
-@MainActor final class ShowcaseController: NSViewController {
+@MainActor final class ShowcaseController: NSViewController, FSCalendarDelegate {
     let scenarios = NSPopUpButton(frame: .zero, pullsDown: false)
     let calendar = FSCalendarView(frame: .zero)
-    let readout = NSTextField(wrappingLabelWithString: "Mac harness ready — renderer milestone follows.")
+    let readout = NSTextField(wrappingLabelWithString: "")
     override func loadView() {
+        try! calendar.apply(configuration: CalendarConfiguration(timeZone: DemoFixtures.calendar.timeZone, locale: DemoFixtures.calendar.locale!))
+        try! calendar.setCurrentPage(DemoFixtures.initialDate)
+        calendar.today = try! CivilDay(date: DemoFixtures.initialDate, timeZone: DemoFixtures.calendar.timeZone)
+        calendar.delegate = self
         view = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 750))
         scenarios.addItems(withTitles: DemoScenario.allCases.map(\.title))
         scenarios.setAccessibilityIdentifier("scenario.selector")
@@ -23,5 +28,15 @@ import FSCalendarAppKit
             stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 24),
             calendar.widthAnchor.constraint(equalTo: stack.widthAnchor), calendar.heightAnchor.constraint(equalToConstant: 340)])
     }
-    @objc private func control(_ sender: NSButton) { readout.stringValue = "\(sender.title) — harness action" }
+    @objc private func control(_ sender: NSButton) {
+        do {
+            switch sender.title {
+            case "Previous": try calendar.navigate(-1)
+            case "Next": try calendar.navigate(1)
+            default: try calendar.setCurrentPage(DemoFixtures.initialDate)
+            }
+            readout.stringValue = "Page: \(calendar.currentPage)"
+        } catch { readout.stringValue = "Rejected: \(error)" }
+    }
+    func calendarCurrentPageDidChange(_ calendar: FSCalendarView) { readout.stringValue = "Page: \(calendar.currentPage)" }
 }
