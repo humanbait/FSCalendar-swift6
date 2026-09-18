@@ -477,6 +477,7 @@
 			"buildPhases" = ("5E9CC503ADCF6ACCE1972424", "864DD4C4286BA75898EBF456", "A827CFAE524B1E54418650F3", "3BF0E8BB3B17BE095AC176BD");
 			"buildRules" = ();
 			"dependencies" = ();
+			"packageProductDependencies" = ();
 			"name" = "FSCalendarLegacy";
 			"productName" = "FSCalendarLegacy";
 			"productReference" = "A8226319224DABE54ED5EEEA";
@@ -499,10 +500,20 @@
 			"isa" = "PBXBuildFile";
 			"fileRef" = "B4113CC32004799EF927D8F4";
 		};
+		"23110E91329F094AC02D8204" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "../Sources/FSCalendarCore/CalendarPresentation.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"755A8820256DF5826BE7CE96" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "23110E91329F094AC02D8204";
+		};
 		"A2B4932084EBE9A2EC979AF9" = {
 			"isa" = "PBXSourcesBuildPhase";
 			"buildActionMask" = 2147483647;
-			"files" = ("08CBC29FDC25F4E3F47AC505");
+			"files" = ("08CBC29FDC25F4E3F47AC505", "755A8820256DF5826BE7CE96");
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
 		"91FC6334FC285661BAED2A5D" = {
@@ -587,6 +598,7 @@
 			"buildPhases" = ("A2B4932084EBE9A2EC979AF9", "91FC6334FC285661BAED2A5D", "2B750E232FD1D7DEA1610412");
 			"buildRules" = ();
 			"dependencies" = ();
+			"packageProductDependencies" = ();
 			"name" = "FSCalendarCore";
 			"productName" = "FSCalendarCore";
 			"productReference" = "7E88C55C35D1EB18F7D798A3";
@@ -753,9 +765,137 @@
 			"buildPhases" = ("8F81D2A8532A1744B47B7B93", "9B7939D5AD11D08A71D3C534", "12B25A7601A082C5FE10762D");
 			"buildRules" = ();
 			"dependencies" = ("086C7E3CAC8A60C93995041C");
+			"packageProductDependencies" = ();
 			"name" = "FSCalendar";
 			"productName" = "FSCalendar";
 			"productReference" = "7057570427DE372E16174201";
+			"productType" = "com.apple.product-type.framework";
+		};
+		"1F23E772E32885CE37E11282" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.framework";
+			"includeInIndex" = 0;
+			"path" = "CalendarDemoSupport.framework";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"B5D6AF6402C1C1DFF71587E9" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "../Development/DemoSupport/DemoModel.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"8C20AB6891617ACE0CE38FD7" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "B5D6AF6402C1C1DFF71587E9";
+		};
+		"EF7B558C74DA997A409793A2" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("8C20AB6891617ACE0CE38FD7");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"88848278E1177654CCBF2620" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "7E88C55C35D1EB18F7D798A3";
+		};
+		"5A21D92212511684E9AD543D" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("88848278E1177654CCBF2620");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"6E2E123350A5B2D741864DFC" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"2CFE855E0CE07B8570F68C12" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "98F54143AB4E86B28C3AFEE0";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "5B1EF304FF905A5B1BA0FBDA";
+			"remoteInfo" = "FSCalendarCore";
+		};
+		"C65CA3354C5BBC5363995333" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "5B1EF304FF905A5B1BA0FBDA";
+			"targetProxy" = "2CFE855E0CE07B8570F68C12";
+		};
+		"89800F48E68E4859CB00411D" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendardemosupport";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"IPHONEOS_DEPLOYMENT_TARGET" = "16.0";
+				"TARGETED_DEVICE_FAMILY" = "1,2";
+				"SDKROOT" = "iphoneos";
+				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+				"DEFINES_MODULE" = "YES";
+				"MACH_O_TYPE" = "staticlib";
+				"SKIP_INSTALL" = "YES";
+				"CODE_SIGNING_ALLOWED" = "NO";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)", "DEBUG=1");
+			};
+			"name" = "Debug";
+		};
+		"95C083E9E0C630B150CC174E" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendardemosupport";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"IPHONEOS_DEPLOYMENT_TARGET" = "16.0";
+				"TARGETED_DEVICE_FAMILY" = "1,2";
+				"SDKROOT" = "iphoneos";
+				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+				"DEFINES_MODULE" = "YES";
+				"MACH_O_TYPE" = "staticlib";
+				"SKIP_INSTALL" = "YES";
+				"CODE_SIGNING_ALLOWED" = "NO";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)");
+			};
+			"name" = "Release";
+		};
+		"45C6618DE051C6E51A347BC1" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("89800F48E68E4859CB00411D", "95C083E9E0C630B150CC174E");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"253BFE6D4BCACA7861FDDFC1" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "45C6618DE051C6E51A347BC1";
+			"buildPhases" = ("EF7B558C74DA997A409793A2", "5A21D92212511684E9AD543D", "6E2E123350A5B2D741864DFC");
+			"buildRules" = ();
+			"dependencies" = ("C65CA3354C5BBC5363995333");
+			"packageProductDependencies" = ();
+			"name" = "CalendarDemoSupport";
+			"productName" = "CalendarDemoSupport";
+			"productReference" = "1F23E772E32885CE37E11282";
 			"productType" = "com.apple.product-type.framework";
 		};
 		"81632FA471E2ABAEAE6D5BC9" = {
@@ -811,6 +951,10 @@
 			"files" = ("A7435CDDF1D108B4F04BB79C", "DD3A671410B03C654A698A2D", "1C205ECAE7DEFA3ADC419CCC", "C909571A13C9615E71F773AB");
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
+		"9F872203D96B131E6384ACF2" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "1F23E772E32885CE37E11282";
+		};
 		"F67203CBC3D4D9A9F80EC576" = {
 			"isa" = "PBXBuildFile";
 			"fileRef" = "A8226319224DABE54ED5EEEA";
@@ -826,7 +970,7 @@
 		"947C513038CB7A66AF1ED0A0" = {
 			"isa" = "PBXFrameworksBuildPhase";
 			"buildActionMask" = 2147483647;
-			"files" = ("F67203CBC3D4D9A9F80EC576", "C06E4DDB646C372A7D5FF790", "CCC439A38EC607CAA77B6FAD");
+			"files" = ("9F872203D96B131E6384ACF2", "F67203CBC3D4D9A9F80EC576", "C06E4DDB646C372A7D5FF790", "CCC439A38EC607CAA77B6FAD");
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
 		"85E88640F6A08E8FF760C009" = {
@@ -834,6 +978,18 @@
 			"buildActionMask" = 2147483647;
 			"files" = ();
 			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"CC93274FC0545EBA2CE2884A" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "98F54143AB4E86B28C3AFEE0";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "253BFE6D4BCACA7861FDDFC1";
+			"remoteInfo" = "CalendarDemoSupport";
+		};
+		"20DB7A3D676F0F977447BF91" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "253BFE6D4BCACA7861FDDFC1";
+			"targetProxy" = "CC93274FC0545EBA2CE2884A";
 		};
 		"85D752B6553CA1DDCD8E0F63" = {
 			"isa" = "PBXContainerItemProxy";
@@ -946,7 +1102,8 @@
 			"buildConfigurationList" = "CD9FE188BB7E3FA753426173";
 			"buildPhases" = ("FDC4AF39F5BD732586577E3E", "947C513038CB7A66AF1ED0A0", "85E88640F6A08E8FF760C009");
 			"buildRules" = ();
-			"dependencies" = ("5BB2B451E67C99C820E2FF04", "96FC2404DBB91D8DFB93E574", "9D498BA4A7903C99F124EA62");
+			"dependencies" = ("20DB7A3D676F0F977447BF91", "5BB2B451E67C99C820E2FF04", "96FC2404DBB91D8DFB93E574", "9D498BA4A7903C99F124EA62");
+			"packageProductDependencies" = ();
 			"name" = "CalendarShowcase";
 			"productName" = "CalendarShowcase";
 			"productReference" = "81632FA471E2ABAEAE6D5BC9";
@@ -1009,6 +1166,16 @@
 			"isa" = "PBXBuildFile";
 			"fileRef" = "86D9FB4F6BA17E9D1523CAE9";
 		};
+		"6DE1EAF68A19EED0B070E25F" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "../Tests/FSCalendarCoreTests/TransitionPlannerTests.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"EF7E2E667B9BA52AE5EEB022" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "6DE1EAF68A19EED0B070E25F";
+		};
 		"331C7BE8F6635AE326E412A5" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
@@ -1022,8 +1189,12 @@
 		"D0D0F31BB46EA33B7394AAB9" = {
 			"isa" = "PBXSourcesBuildPhase";
 			"buildActionMask" = 2147483647;
-			"files" = ("5001F7DA25F104BB626C12B2", "A2E5BC8318106BE54A91A26F", "C63CD9D93E88C66522C7F957", "BE3DC941BF8DD6313712CDF8", "5757DCCC8E970D6441D87757", "2AEA186D05E247718949F70D");
+			"files" = ("5001F7DA25F104BB626C12B2", "A2E5BC8318106BE54A91A26F", "C63CD9D93E88C66522C7F957", "BE3DC941BF8DD6313712CDF8", "5757DCCC8E970D6441D87757", "EF7E2E667B9BA52AE5EEB022", "2AEA186D05E247718949F70D");
 			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"87B64E444AE8BE1AEC2725ED" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "1F23E772E32885CE37E11282";
 		};
 		"BEBA7E3EE3E1BE742C8F871D" = {
 			"isa" = "PBXBuildFile";
@@ -1040,7 +1211,7 @@
 		"8650EE4E0A533E0995E60B74" = {
 			"isa" = "PBXFrameworksBuildPhase";
 			"buildActionMask" = 2147483647;
-			"files" = ("BEBA7E3EE3E1BE742C8F871D", "106855909D9399F3345A9BEF", "8C66E20FDF0FF88F0EA2EE9C");
+			"files" = ("87B64E444AE8BE1AEC2725ED", "BEBA7E3EE3E1BE742C8F871D", "106855909D9399F3345A9BEF", "8C66E20FDF0FF88F0EA2EE9C");
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
 		"715513396132B3D1F6132A33" = {
@@ -1129,6 +1300,7 @@
 			"buildPhases" = ("D0D0F31BB46EA33B7394AAB9", "8650EE4E0A533E0995E60B74", "715513396132B3D1F6132A33");
 			"buildRules" = ();
 			"dependencies" = ("A37604295C26247FB3D32632");
+			"packageProductDependencies" = ();
 			"name" = "CalendarShowcaseTests";
 			"productName" = "CalendarShowcaseTests";
 			"productReference" = "A0AAA320EFE8363A547EA7CA";
@@ -1245,14 +1417,571 @@
 			"buildPhases" = ("275C23BF2BB4785C9D04F089", "284708B5A35B1CEA8235BDD4", "A1AEF0FF573C300DF6FE7AB1");
 			"buildRules" = ();
 			"dependencies" = ("1BBD3F63C9B8FF7FAB328936");
+			"packageProductDependencies" = ();
 			"name" = "CalendarShowcaseUITests";
 			"productName" = "CalendarShowcaseUITests";
 			"productReference" = "23C21D3607444669AB28773B";
 			"productType" = "com.apple.product-type.bundle.ui-testing";
 		};
+		"CF21FADD42EAB8F8303A3895" = {
+			"isa" = "XCLocalSwiftPackageReference";
+			"relativePath" = "..";
+		};
+		"C8FD54D416DDC7535F55B3AB" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.framework";
+			"includeInIndex" = 0;
+			"path" = "CalendarDemoSupportMac.framework";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"8D649EF61A4CF8AF9380ADB4" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "B5D6AF6402C1C1DFF71587E9";
+		};
+		"72CF63E3451F557AA9D09552" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("8D649EF61A4CF8AF9380ADB4");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"6F230B07D9CBB291E27F025A" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"016E58FDBD11DB06EBAA5AF8" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"636FA86B4CE4CA7BA8262D66" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendardemosupportmac";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"DEFINES_MODULE" = "YES";
+				"MACH_O_TYPE" = "staticlib";
+				"SKIP_INSTALL" = "YES";
+				"CODE_SIGNING_ALLOWED" = "NO";
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)", "DEBUG=1");
+			};
+			"name" = "Debug";
+		};
+		"F15CF33758D6C8E8773B20A6" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendardemosupportmac";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"DEFINES_MODULE" = "YES";
+				"MACH_O_TYPE" = "staticlib";
+				"SKIP_INSTALL" = "YES";
+				"CODE_SIGNING_ALLOWED" = "NO";
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)");
+			};
+			"name" = "Release";
+		};
+		"40E83A76991C30D2E25F97B7" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("636FA86B4CE4CA7BA8262D66", "F15CF33758D6C8E8773B20A6");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"4250E6CA61C9D17106890D88" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "40E83A76991C30D2E25F97B7";
+			"buildPhases" = ("72CF63E3451F557AA9D09552", "6F230B07D9CBB291E27F025A", "016E58FDBD11DB06EBAA5AF8");
+			"buildRules" = ();
+			"dependencies" = ();
+			"packageProductDependencies" = ();
+			"name" = "CalendarDemoSupportMac";
+			"productName" = "CalendarDemoSupportMac";
+			"productReference" = "C8FD54D416DDC7535F55B3AB";
+			"productType" = "com.apple.product-type.framework";
+		};
+		"E490B34786C976E221E431AA" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.application";
+			"includeInIndex" = 0;
+			"path" = "CalendarShowcaseMac.app";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"3565198C6397E22419590705" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "CalendarShowcaseMac/ShowcaseController.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"6309F7AE1ACE5ACB78694360" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "3565198C6397E22419590705";
+		};
+		"B7192EA80985FD79AADC6598" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "CalendarShowcaseMac/main.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"B7427B35B0E133260D2A2B40" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "B7192EA80985FD79AADC6598";
+		};
+		"E547D2059947F9E625162982" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("6309F7AE1ACE5ACB78694360", "B7427B35B0E133260D2A2B40");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"7E6D51B14D0DA0FE9894E147" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "C8FD54D416DDC7535F55B3AB";
+		};
+		"09F2EA4CCA634E3347F9E38B" = {
+			"isa" = "XCSwiftPackageProductDependency";
+			"productName" = "FSCalendarCore";
+		};
+		"52FA648B7A8A20F4FB13E00B" = {
+			"isa" = "PBXBuildFile";
+			"productRef" = "09F2EA4CCA634E3347F9E38B";
+		};
+		"44752536E1334B50A3427BD8" = {
+			"isa" = "XCSwiftPackageProductDependency";
+			"productName" = "FSCalendarAppKit";
+		};
+		"003856485E921AD39E4B6ECB" = {
+			"isa" = "PBXBuildFile";
+			"productRef" = "44752536E1334B50A3427BD8";
+		};
+		"ED0C3AE3FF365F02684939DA" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("7E6D51B14D0DA0FE9894E147", "52FA648B7A8A20F4FB13E00B", "003856485E921AD39E4B6ECB");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"E556413BC7E144EECE55F2D4" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"C9957AB03AAE1CA94E0E2E37" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "98F54143AB4E86B28C3AFEE0";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "4250E6CA61C9D17106890D88";
+			"remoteInfo" = "CalendarDemoSupportMac";
+		};
+		"ADC807D2978B39949F70C150" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "4250E6CA61C9D17106890D88";
+			"targetProxy" = "C9957AB03AAE1CA94E0E2E37";
+		};
+		"7FCD42EE74DDD9C8D2CDC4FD" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendarshowcasemac";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"INFOPLIST_KEY_CFBundleDisplayName" = "Calendar Lab";
+				"OTHER_LDFLAGS" = ("$(inherited)", "-ObjC");
+				"CURRENT_PROJECT_VERSION" = "1";
+				"MARKETING_VERSION" = "0.1.0";
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"INFOPLIST_KEY_NSPrincipalClass" = "NSApplication";
+				"INFOPLIST_KEY_LSApplicationCategoryType" = "public.app-category.developer-tools";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)", "DEBUG=1");
+			};
+			"name" = "Debug";
+		};
+		"07E07E2E4CB415D9A5395453" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendarshowcasemac";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"INFOPLIST_KEY_CFBundleDisplayName" = "Calendar Lab";
+				"OTHER_LDFLAGS" = ("$(inherited)", "-ObjC");
+				"CURRENT_PROJECT_VERSION" = "1";
+				"MARKETING_VERSION" = "0.1.0";
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"INFOPLIST_KEY_NSPrincipalClass" = "NSApplication";
+				"INFOPLIST_KEY_LSApplicationCategoryType" = "public.app-category.developer-tools";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)");
+			};
+			"name" = "Release";
+		};
+		"6A938A7CBEE9826FED17DCF5" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("7FCD42EE74DDD9C8D2CDC4FD", "07E07E2E4CB415D9A5395453");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"239F3C8BE583882221681140" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "6A938A7CBEE9826FED17DCF5";
+			"buildPhases" = ("E547D2059947F9E625162982", "ED0C3AE3FF365F02684939DA", "E556413BC7E144EECE55F2D4");
+			"buildRules" = ();
+			"dependencies" = ("ADC807D2978B39949F70C150");
+			"packageProductDependencies" = ("09F2EA4CCA634E3347F9E38B", "44752536E1334B50A3427BD8");
+			"name" = "CalendarShowcaseMac";
+			"productName" = "CalendarShowcaseMac";
+			"productReference" = "E490B34786C976E221E431AA";
+			"productType" = "com.apple.product-type.application";
+		};
+		"DB78D612172724630BA8189D" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.cfbundle";
+			"includeInIndex" = 0;
+			"path" = "CalendarShowcaseMacTests.xctest";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"7645BD64B7A86272E40CF5AF" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "CalendarShowcaseMacTests/MacHostTests.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"381ACF6F2BE0343EF5ACC1FA" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "7645BD64B7A86272E40CF5AF";
+		};
+		"F353A5261FFC63FE3713203E" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "../Tests/FSCalendarAppKitTests/CalendarAppKitTests.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"FDA71C721DC21B23828B2355" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "F353A5261FFC63FE3713203E";
+		};
+		"92B2A0B1A9B83B23A693EE41" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("381ACF6F2BE0343EF5ACC1FA", "FDA71C721DC21B23828B2355");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"5E692C6602F694D74BEFE5BC" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "C8FD54D416DDC7535F55B3AB";
+		};
+		"57BFCB448065432E256800AB" = {
+			"isa" = "XCSwiftPackageProductDependency";
+			"productName" = "FSCalendarCore";
+		};
+		"DB46548F90AB464B4EF651DD" = {
+			"isa" = "PBXBuildFile";
+			"productRef" = "57BFCB448065432E256800AB";
+		};
+		"5FB4365F5F35A126C148314F" = {
+			"isa" = "XCSwiftPackageProductDependency";
+			"productName" = "FSCalendarAppKit";
+		};
+		"7E7C89F3A94BBF020D85BE40" = {
+			"isa" = "PBXBuildFile";
+			"productRef" = "5FB4365F5F35A126C148314F";
+		};
+		"DA909A2C5B688ABAA4B4D53D" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("5E692C6602F694D74BEFE5BC", "DB46548F90AB464B4EF651DD", "7E7C89F3A94BBF020D85BE40");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"3F652062A97C11698CF39C83" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"274B03BE0A3C139D35F39187" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "98F54143AB4E86B28C3AFEE0";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "239F3C8BE583882221681140";
+			"remoteInfo" = "CalendarShowcaseMac";
+		};
+		"F0993F071B462264F46CE35B" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "239F3C8BE583882221681140";
+			"targetProxy" = "274B03BE0A3C139D35F39187";
+		};
+		"4E3F3ADC5BE294D172DFA4C5" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendarshowcasemactests";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"TEST_HOST" = "$(BUILT_PRODUCTS_DIR)/CalendarShowcaseMac.app/Contents/MacOS/CalendarShowcaseMac";
+				"BUNDLE_LOADER" = "$(TEST_HOST)";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)", "DEBUG=1");
+			};
+			"name" = "Debug";
+		};
+		"CAE7E0CC3EA05FCFA46BBDEC" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendarshowcasemactests";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"TEST_HOST" = "$(BUILT_PRODUCTS_DIR)/CalendarShowcaseMac.app/Contents/MacOS/CalendarShowcaseMac";
+				"BUNDLE_LOADER" = "$(TEST_HOST)";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)");
+			};
+			"name" = "Release";
+		};
+		"B7EE1F3F366609F4B29E1CAA" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("4E3F3ADC5BE294D172DFA4C5", "CAE7E0CC3EA05FCFA46BBDEC");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"AB8985818AEEC1F01784EC09" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "B7EE1F3F366609F4B29E1CAA";
+			"buildPhases" = ("92B2A0B1A9B83B23A693EE41", "DA909A2C5B688ABAA4B4D53D", "3F652062A97C11698CF39C83");
+			"buildRules" = ();
+			"dependencies" = ("F0993F071B462264F46CE35B");
+			"packageProductDependencies" = ("57BFCB448065432E256800AB", "5FB4365F5F35A126C148314F");
+			"name" = "CalendarShowcaseMacTests";
+			"productName" = "CalendarShowcaseMacTests";
+			"productReference" = "DB78D612172724630BA8189D";
+			"productType" = "com.apple.product-type.bundle.unit-test";
+		};
+		"27952999CA5692BF4DA47226" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.cfbundle";
+			"includeInIndex" = 0;
+			"path" = "CalendarShowcaseMacUITests.xctest";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"6A39F9C28E2A8FA51754B54A" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "CalendarShowcaseMacUITests/MacUITests.swift";
+			"sourceTree" = "SOURCE_ROOT";
+		};
+		"ECA71255A96A405EBD69705A" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "6A39F9C28E2A8FA51754B54A";
+		};
+		"C9D3DBD7B47545C9F992AD4F" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("ECA71255A96A405EBD69705A");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"844BA498A0C6EFCA3CB54279" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"9D1D367C46EB3C25A38E940A" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"EF51E83806F1C34642B5F853" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "98F54143AB4E86B28C3AFEE0";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "239F3C8BE583882221681140";
+			"remoteInfo" = "CalendarShowcaseMac";
+		};
+		"0629D4ED6CAF5F1D565C5919" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "239F3C8BE583882221681140";
+			"targetProxy" = "EF51E83806F1C34642B5F853";
+		};
+		"2B4D7A5558146F00F459CBF3" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendarshowcasemacuitests";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"TEST_TARGET_NAME" = "CalendarShowcaseMac";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)", "DEBUG=1");
+			};
+			"name" = "Debug";
+		};
+		"1B28E4A5366B58434C0CF5E7" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "com.spbgfs.fscalendar.calendarshowcasemacuitests";
+				"DEVELOPMENT_TEAM" = "MDPX5436J8";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"GENERATE_INFOPLIST_FILE" = "YES";
+				"SWIFT_VERSION" = "6.0";
+				"SDKROOT" = "macosx";
+				"SUPPORTED_PLATFORMS" = "macosx";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"CLANG_ENABLE_OBJC_ARC" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"SWIFT_EMIT_LOC_STRINGS" = "NO";
+				"ENABLE_TESTABILITY" = "YES";
+				"LD_RUNPATH_SEARCH_PATHS" = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				"MACOSX_DEPLOYMENT_TARGET" = "13.0";
+				"ONLY_ACTIVE_ARCH" = "YES";
+				"CODE_SIGN_IDENTITY" = "-";
+				"ENABLE_HARDENED_RUNTIME" = "NO";
+				"SWIFT_TREAT_WARNINGS_AS_ERRORS" = "YES";
+				"TEST_TARGET_NAME" = "CalendarShowcaseMac";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"GCC_PREPROCESSOR_DEFINITIONS" = ("$(inherited)");
+			};
+			"name" = "Release";
+		};
+		"8BA8CD1FCC55E28CFE58EF2B" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("2B4D7A5558146F00F459CBF3", "1B28E4A5366B58434C0CF5E7");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"60639306B758A17D5AEBF36C" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "8BA8CD1FCC55E28CFE58EF2B";
+			"buildPhases" = ("C9D3DBD7B47545C9F992AD4F", "844BA498A0C6EFCA3CB54279", "9D1D367C46EB3C25A38E940A");
+			"buildRules" = ();
+			"dependencies" = ("0629D4ED6CAF5F1D565C5919");
+			"packageProductDependencies" = ();
+			"name" = "CalendarShowcaseMacUITests";
+			"productName" = "CalendarShowcaseMacUITests";
+			"productReference" = "27952999CA5692BF4DA47226";
+			"productType" = "com.apple.product-type.bundle.ui-testing";
+		};
 		"FBDC4F23F93125BBEEAE800C" = {
 			"isa" = "PBXGroup";
-			"children" = ("A8226319224DABE54ED5EEEA", "7E88C55C35D1EB18F7D798A3", "7057570427DE372E16174201", "81632FA471E2ABAEAE6D5BC9", "A0AAA320EFE8363A547EA7CA", "23C21D3607444669AB28773B");
+			"children" = ("A8226319224DABE54ED5EEEA", "7E88C55C35D1EB18F7D798A3", "7057570427DE372E16174201", "1F23E772E32885CE37E11282", "81632FA471E2ABAEAE6D5BC9", "A0AAA320EFE8363A547EA7CA", "23C21D3607444669AB28773B", "C8FD54D416DDC7535F55B3AB", "E490B34786C976E221E431AA", "DB78D612172724630BA8189D", "27952999CA5692BF4DA47226");
 			"name" = "Products";
 			"sourceTree" = "<group>";
 		};
@@ -1264,7 +1993,7 @@
 		};
 		"DC76E9F0C0006E8F919E0C51" = {
 			"isa" = "PBXGroup";
-			"children" = ("E7DBD8C70AB11DF4B8BED929", "C9A38D345043902EFEBF6A29", "DB60EE893B7734AE3C0D338C", "C45F7014D648B07260D184BC", "C51C15CE22B4CBD886094C03", "407C26D819107966FC0109A4", "9C9AB7436D7549BEA9016F7F", "AF0BDA54E24101BA1F01DCA5", "7EB563687DC061914F250F77", "3041A22A74E1679F920725E9", "E0C1CAA4FACEC7076E9EADBC", "B16D80B6D82A4BAD65599125", "CCA1FC4E97E0DF835A7C2060", "5126D7DC71F8CE19F8304171", "420EC22048EB2F214005F56F", "9D40E5DCBC6E8C4B5C54BD40", "61DB4CE6B1494ED3BA034C7F", "FC28995AFE362D6CB8BEE722", "C1A10AAE38A09784E771F32F", "B1C9D5113C737DE102148D69", "0137FCCA6E0A6F4AD80CB6EF", "AC99589F003C8F8940B276CF", "9846DD07FF954D244EAE677E", "23DDA085F33E042694BDDBA1", "C3CC3C77E17875403AE09301", "A27D07186A12E5E7DFAE343C", "7A54A994A5656D2DB309F2C3", "7C92FE471DD64BBDAAB5B22B", "97C727AC87DC36A3FCE24245", "C5416465BDC0A1E513536314", "58D5C1F8815A0F1F7C87E2F2", "C3330C39313DC3D1E8F70938", "B4113CC32004799EF927D8F4", "AFE41A8C5BA686AC1D0FE0C0", "88DDC9E3D44F91136C53D5FB", "72E529F73CBD50E227FD856B", "7A88F98E1631F00AD8CC8568", "5819106557D3AF98A5FADD71", "28FDB50C175165A9506196E9", "517351B08E583ED17EDCE03A", "AFB199B79DA62FDDF971056F", "3E6923A95D5928BAC055040F", "E6CF4ABA4916CA5B5FF3EE32", "0910B5A6D0D836A5BAFC18E3", "B9BD3F33C797CCDC54CEAD70", "3EDBB8F452D823DCA17F5020", "86D9FB4F6BA17E9D1523CAE9", "331C7BE8F6635AE326E412A5", "099B8C91163280888C789D5D", "FFD1E8476BE8DFDA246F284E", "FBDC4F23F93125BBEEAE800C");
+			"children" = ("E7DBD8C70AB11DF4B8BED929", "C9A38D345043902EFEBF6A29", "DB60EE893B7734AE3C0D338C", "C45F7014D648B07260D184BC", "C51C15CE22B4CBD886094C03", "407C26D819107966FC0109A4", "9C9AB7436D7549BEA9016F7F", "AF0BDA54E24101BA1F01DCA5", "7EB563687DC061914F250F77", "3041A22A74E1679F920725E9", "E0C1CAA4FACEC7076E9EADBC", "B16D80B6D82A4BAD65599125", "CCA1FC4E97E0DF835A7C2060", "5126D7DC71F8CE19F8304171", "420EC22048EB2F214005F56F", "9D40E5DCBC6E8C4B5C54BD40", "61DB4CE6B1494ED3BA034C7F", "FC28995AFE362D6CB8BEE722", "C1A10AAE38A09784E771F32F", "B1C9D5113C737DE102148D69", "0137FCCA6E0A6F4AD80CB6EF", "AC99589F003C8F8940B276CF", "9846DD07FF954D244EAE677E", "23DDA085F33E042694BDDBA1", "C3CC3C77E17875403AE09301", "A27D07186A12E5E7DFAE343C", "7A54A994A5656D2DB309F2C3", "7C92FE471DD64BBDAAB5B22B", "97C727AC87DC36A3FCE24245", "C5416465BDC0A1E513536314", "58D5C1F8815A0F1F7C87E2F2", "C3330C39313DC3D1E8F70938", "B4113CC32004799EF927D8F4", "23110E91329F094AC02D8204", "AFE41A8C5BA686AC1D0FE0C0", "88DDC9E3D44F91136C53D5FB", "72E529F73CBD50E227FD856B", "7A88F98E1631F00AD8CC8568", "5819106557D3AF98A5FADD71", "B5D6AF6402C1C1DFF71587E9", "28FDB50C175165A9506196E9", "517351B08E583ED17EDCE03A", "AFB199B79DA62FDDF971056F", "3E6923A95D5928BAC055040F", "E6CF4ABA4916CA5B5FF3EE32", "0910B5A6D0D836A5BAFC18E3", "B9BD3F33C797CCDC54CEAD70", "3EDBB8F452D823DCA17F5020", "86D9FB4F6BA17E9D1523CAE9", "6DE1EAF68A19EED0B070E25F", "331C7BE8F6635AE326E412A5", "099B8C91163280888C789D5D", "3565198C6397E22419590705", "B7192EA80985FD79AADC6598", "7645BD64B7A86272E40CF5AF", "F353A5261FFC63FE3713203E", "6A39F9C28E2A8FA51754B54A", "FFD1E8476BE8DFDA246F284E", "FBDC4F23F93125BBEEAE800C");
 			"sourceTree" = "<group>";
 		};
 		"AB52CB08E0FDF02BF6C67C33" = {
@@ -1322,7 +2051,8 @@
 			"productRefGroup" = "FBDC4F23F93125BBEEAE800C";
 			"projectDirPath" = "";
 			"projectRoot" = "";
-			"targets" = ("B146A56E1BD3F93F19DFD66F", "5B1EF304FF905A5B1BA0FBDA", "82AD5E6D8C7F9296BDF7089A", "660849A8C7D49A1419FE6191", "631974F29E71808D0C7A71B9", "C0376A1982B11CEE751A7FF5");
+			"targets" = ("B146A56E1BD3F93F19DFD66F", "5B1EF304FF905A5B1BA0FBDA", "82AD5E6D8C7F9296BDF7089A", "253BFE6D4BCACA7861FDDFC1", "660849A8C7D49A1419FE6191", "631974F29E71808D0C7A71B9", "C0376A1982B11CEE751A7FF5", "4250E6CA61C9D17106890D88", "239F3C8BE583882221681140", "AB8985818AEEC1F01784EC09", "60639306B758A17D5AEBF36C");
+			"packageReferences" = ("CF21FADD42EAB8F8303A3895");
 		};
 	};
 	"rootObject" = "98F54143AB4E86B28C3AFEE0";

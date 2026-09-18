@@ -1,3 +1,4 @@
+import CalendarDemoSupport
 import UIKit
 
 @main
@@ -62,7 +63,7 @@ final class ScenarioListController: UITableViewController {
 @MainActor
 final class ScenarioController: UIViewController, UITableViewDataSource, UIGestureRecognizerDelegate {
     let scenario: DemoScenario
-    let driver: any CalendarDemoDriver
+    let driver: any UIKitCalendarDemoDriver
     private let pageLabel = UILabel()
     private let selectionLabel = UILabel()
     private let eventLabel = UILabel()

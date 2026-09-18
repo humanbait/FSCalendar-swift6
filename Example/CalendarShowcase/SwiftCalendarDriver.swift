@@ -1,8 +1,9 @@
+import CalendarDemoSupport
 import UIKit
 import FSCalendar
 import FSCalendarCore
 
-@MainActor final class SwiftCalendarDriver: CalendarDemoDriver, FSCalendarDataSource, FSCalendarDelegate {
+@MainActor final class SwiftCalendarDriver: UIKitCalendarDemoDriver, FSCalendarDataSource, FSCalendarDelegate {
     let calendar = FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 340))
     let scenario: DemoScenario
     var onChange: (() -> Void)?

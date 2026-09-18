@@ -140,10 +140,8 @@ extension FSCalendar {
                   state.occurrence.isSelectable, !state.occurrence.isHidden else { return nil }
             return state.occurrence.day
         })
-        if let selected = selectedDays.reversed().first(where: visible.contains) { return selected }
-        if let today, visible.contains(today), engine.isSelectable(today) { return today }
-        if let first = visible.sorted().first { return first }
-        return clamped(page)
+        return CalendarTransitionPlan(engine: engine, currentPage: page, visibleDays: Array(visible),
+            selectedDays: selectedDays, today: today, targetMode: mode).anchor
     }
     /// Forward a container's vertical pan here to coordinate a calendar above a scrolling list.
     public func handleScopeGesture(_ gesture: UIPanGestureRecognizer) {

@@ -1,0 +1,33 @@
+{
+  "configurations": [
+    {
+      "id": "07291528-7803-4137-8147-74039C565809",
+      "name": "Native AppKit",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "uiTestingScreenshotsLifetime": "keepAlways",
+    "userAttachmentLifetime": "keepAlways",
+    "testTimeoutsEnabled": true
+  },
+  "version": 1,
+  "testTargets": [
+    {
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:CalendarShowcase.xcodeproj",
+        "identifier": "AB8985818AEEC1F01784EC09",
+        "name": "CalendarShowcaseMacTests"
+      }
+    },
+    {
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:CalendarShowcase.xcodeproj",
+        "identifier": "60639306B758A17D5AEBF36C",
+        "name": "CalendarShowcaseMacUITests"
+      }
+    }
+  ]
+}

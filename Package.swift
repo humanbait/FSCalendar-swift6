@@ -6,10 +6,14 @@ let package = Package(
     platforms: [.iOS(.v16), .macOS(.v13)],
     products: [
         .library(name: "FSCalendarCore", targets: ["FSCalendarCore"]),
-        .library(name: "FSCalendar", targets: ["FSCalendar"])
+        .library(name: "FSCalendar", targets: ["FSCalendar"]),
+        .library(name: "FSCalendarAppKit", targets: ["FSCalendarAppKit"])
     ],
     targets: [
         .target(name: "FSCalendarCore"),
+        .target(name: "CalendarDemoSupport", dependencies: ["FSCalendarCore"], path: "Development/DemoSupport"),
+        .target(name: "FSCalendarAppKit", dependencies: ["FSCalendarCore"]),
+        .testTarget(name: "FSCalendarAppKitTests", dependencies: ["FSCalendarAppKit", "FSCalendarCore"]),
         .target(name: "FSCalendar", dependencies: ["FSCalendarCore"]),
         .testTarget(name: "FSCalendarCoreTests", dependencies: ["FSCalendarCore"]),
         .testTarget(name: "FSCalendarTests", dependencies: ["FSCalendar", "FSCalendarCore"])

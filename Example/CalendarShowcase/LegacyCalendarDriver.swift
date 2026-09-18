@@ -1,8 +1,9 @@
+import CalendarDemoSupport
 import UIKit
 @preconcurrency import FSCalendarLegacy
 
 @MainActor
-final class LegacyCalendarDriver: NSObject, CalendarDemoDriver, @preconcurrency FSCalendarDataSource, @preconcurrency FSCalendarDelegate, @preconcurrency FSCalendarDelegateAppearance {
+final class LegacyCalendarDriver: NSObject, UIKitCalendarDemoDriver, @preconcurrency FSCalendarDataSource, @preconcurrency FSCalendarDelegate, @preconcurrency FSCalendarDelegateAppearance {
     let calendar = FSCalendarLegacy.FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 320))
     let scenario: DemoScenario
     var onChange: (() -> Void)?

@@ -2,16 +2,10 @@
 import UIKit
 import FSCalendarCore
 
-public enum CalendarScrollAxis: Hashable, Sendable { case horizontal, vertical }
-public enum CalendarDisplayMode: Hashable, Sendable {
-    case month(CalendarScrollAxis)
-    case week
-    case continuousMonths
-    public var scope: CalendarScope { self == .week ? .week : .month }
-    public var isContinuous: Bool { self == .continuousMonths }
-    var isHorizontal: Bool { self == .week || self == .month(.horizontal) }
-}
-public enum CalendarTransitionState: Hashable, Sendable { case idle, interactive, settling }
+public typealias CalendarScrollAxis = FSCalendarCore.CalendarScrollAxis
+public typealias CalendarDisplayMode = FSCalendarCore.CalendarDisplayMode
+public typealias CalendarTransitionState = FSCalendarCore.CalendarTransitionState
+public typealias DayState = FSCalendarCore.DayState
 
 @MainActor public struct FSCalendarAppearance {
     public var titleColor: UIColor = .label
@@ -82,12 +76,6 @@ public enum CalendarTransitionState: Hashable, Sendable { case idle, interactive
         self.eventColor = eventColor; self.cornerRadius = cornerRadius
     }
 }
-public struct DayState: Hashable, Sendable {
-    public let occurrence: DayOccurrence
-    public let isSelected: Bool
-    public let isToday: Bool
-}
-
 @MainActor public protocol FSCalendarDataSource: AnyObject {
     func calendar(_ calendar: FSCalendar, contentFor day: CivilDay) -> DayContent
     func calendar(_ calendar: FSCalendar, appearanceFor day: CivilDay) -> DayAppearance

@@ -44,7 +44,7 @@ targets = []
 target_products = {}
 target_ids = {}
 
-def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None):
+def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None, platform="ios", package_products=()):
     tid = oid('target:' + name)
     target_ids[name] = tid
     is_framework = product_type.endswith('framework')
@@ -68,6 +68,11 @@ def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None
     if headers:
         phases.append(obj(name + ':headers', 'PBXHeadersBuildPhase', buildActionMask=2147483647, files=headers, runOnlyForDeploymentPostprocessing=0))
     links = [build(name + ':link:' + dep, target_products[dep]) for dep in frameworks]
+    package_refs = []
+    for product_name in package_products:
+        dependency = obj(name + ':package:' + product_name, 'XCSwiftPackageProductDependency', productName=product_name)
+        package_refs.append(dependency)
+        links.append(obj(name + ':package-build:' + product_name, 'PBXBuildFile', productRef=dependency))
     phases.append(obj(name + ':frameworks', 'PBXFrameworksBuildPhase', buildActionMask=2147483647, files=links, runOnlyForDeploymentPostprocessing=0))
     phases.append(obj(name + ':resources', 'PBXResourcesBuildPhase', buildActionMask=2147483647, files=[], runOnlyForDeploymentPostprocessing=0))
     deps = []
@@ -93,33 +98,57 @@ def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None
                        'INFOPLIST_KEY_UISupportedInterfaceOrientations': 'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
                        'INFOPLIST_KEY_UIRequiresFullScreen': 'YES', 'OTHER_LDFLAGS': ['$(inherited)', '-ObjC'],
                        'CURRENT_PROJECT_VERSION': '1', 'MARKETING_VERSION': '0.1.0'})
+    if platform == "macos":
+        for key in ['IPHONEOS_DEPLOYMENT_TARGET', 'TARGETED_DEVICE_FAMILY',
+                    'INFOPLIST_KEY_UILaunchScreen_Generation', 'INFOPLIST_KEY_UISupportedInterfaceOrientations',
+                    'INFOPLIST_KEY_UIRequiresFullScreen']:
+            common.pop(key, None)
+        common.update({'SDKROOT': 'macosx', 'SUPPORTED_PLATFORMS': 'macosx',
+            'MACOSX_DEPLOYMENT_TARGET': '13.0', 'ONLY_ACTIVE_ARCH': 'YES', 'CODE_SIGN_IDENTITY': '-',
+            'ENABLE_HARDENED_RUNTIME': 'NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS': 'YES',
+            'LD_RUNPATH_SEARCH_PATHS': ['$(inherited)', '@executable_path/../Frameworks', '@loader_path/../Frameworks']})
+        if is_app:
+            common.update({'INFOPLIST_KEY_NSPrincipalClass': 'NSApplication',
+                           'INFOPLIST_KEY_LSApplicationCategoryType': 'public.app-category.developer-tools'})
     if extra:
         common.update(extra)
     obj('target:' + name, 'PBXNativeTarget', buildConfigurationList=configs(name, common), buildPhases=phases,
-        buildRules=[], dependencies=deps, name=name, productName=name, productReference=product, productType=product_type)
+        buildRules=[], dependencies=deps, packageProductDependencies=package_refs, name=name, productName=name, productReference=product, productType=product_type)
     targets.append(tid)
 
 legacy = list((ROOT / 'Development/Legacy/FSCalendar').glob('*.[hm]'))
 target('FSCalendarLegacy', 'com.apple.product-type.framework', legacy)
 modern = (ROOT / 'Sources/FSCalendar/FSCalendar.swift').exists()
 if modern:
-    target('FSCalendarCore', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendarCore').glob('*.swift'))
-    target('FSCalendar', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendar').glob('*.swift'),
+    target('FSCalendarCore', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendarCore').rglob('*.swift'))
+    target('FSCalendar', 'com.apple.product-type.framework', (ROOT / 'Sources/FSCalendar').rglob('*.swift'),
            dependencies=['FSCalendarCore'], frameworks=['FSCalendarCore'])
-libs = ['FSCalendarLegacy'] + (['FSCalendarCore', 'FSCalendar'] if modern else [])
-target('CalendarShowcase', 'com.apple.product-type.application', (ROOT / 'Example/CalendarShowcase').glob('*.swift'), dependencies=libs, frameworks=libs)
-unit_paths = list((ROOT / 'Example/CalendarShowcaseTests').glob('*.swift')) + list((ROOT / 'Example/CalendarShowcaseTests').glob('*.m'))
+target('CalendarDemoSupport', 'com.apple.product-type.framework', (ROOT / 'Development/DemoSupport').rglob('*.swift'), dependencies=['FSCalendarCore'], frameworks=['FSCalendarCore'])
+libs = ['CalendarDemoSupport', 'FSCalendarLegacy'] + (['FSCalendarCore', 'FSCalendar'] if modern else [])
+target('CalendarShowcase', 'com.apple.product-type.application', (ROOT / 'Example/CalendarShowcase').rglob('*.swift'), dependencies=libs, frameworks=libs)
+unit_paths = list((ROOT / 'Example/CalendarShowcaseTests').rglob('*.swift')) + list((ROOT / 'Example/CalendarShowcaseTests').glob('*.m'))
 if modern:
-    unit_paths += list((ROOT / 'Tests/FSCalendarCoreTests').glob('*.swift')) + list((ROOT / 'Tests/FSCalendarTests').glob('*.swift'))
+    unit_paths += list((ROOT / 'Tests/FSCalendarCoreTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarTests').rglob('*.swift'))
 target('CalendarShowcaseTests', 'com.apple.product-type.bundle.unit-test', unit_paths,
        dependencies=['CalendarShowcase'], frameworks=libs,
        extra={'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/CalendarShowcase.app/CalendarShowcase', 'BUNDLE_LOADER': '$(TEST_HOST)',
               'HEADER_SEARCH_PATHS': ['$(inherited)', '$(SRCROOT)/../Development/Legacy/FSCalendar']})
-target('CalendarShowcaseUITests', 'com.apple.product-type.bundle.ui-testing', (ROOT / 'Example/CalendarShowcaseUITests').glob('*.swift'),
+target('CalendarShowcaseUITests', 'com.apple.product-type.bundle.ui-testing', (ROOT / 'Example/CalendarShowcaseUITests').rglob('*.swift'),
        dependencies=['CalendarShowcase'], extra={'TEST_TARGET_NAME': 'CalendarShowcase'})
+local_package = obj('local-package', 'XCLocalSwiftPackageReference', relativePath='..')
+mac_libs = ['FSCalendarCore', 'FSCalendarAppKit']
+target('CalendarDemoSupportMac', 'com.apple.product-type.framework', (ROOT / 'Development/DemoSupport').rglob('*.swift'), platform='macos')
+target('CalendarShowcaseMac', 'com.apple.product-type.application', (ROOT / 'Example/CalendarShowcaseMac').rglob('*.swift'),
+       platform='macos', package_products=mac_libs, dependencies=['CalendarDemoSupportMac'], frameworks=['CalendarDemoSupportMac'])
+mac_test_paths = list((ROOT / 'Example/CalendarShowcaseMacTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarAppKitTests').rglob('*.swift'))
+target('CalendarShowcaseMacTests', 'com.apple.product-type.bundle.unit-test', mac_test_paths,
+       dependencies=['CalendarShowcaseMac'], platform='macos', package_products=mac_libs, frameworks=['CalendarDemoSupportMac'],
+       extra={'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/CalendarShowcaseMac.app/Contents/MacOS/CalendarShowcaseMac', 'BUNDLE_LOADER': '$(TEST_HOST)'})
+target('CalendarShowcaseMacUITests', 'com.apple.product-type.bundle.ui-testing', (ROOT / 'Example/CalendarShowcaseMacUITests').rglob('*.swift'),
+       dependencies=['CalendarShowcaseMac'], platform='macos', extra={'TEST_TARGET_NAME': 'CalendarShowcaseMac'})
 product_group = obj('products', 'PBXGroup', children=products, name='Products', sourceTree='<group>')
 file_refs.append(ref('CalendarShowcase.xctestplan', 'text'))
-root_group = obj('root', 'PBXGroup', children=file_refs + [product_group], sourceTree='<group>')
+root_group = obj('root', 'PBXGroup', children=list(dict.fromkeys(file_refs)) + [product_group], sourceTree='<group>')
 obj('project', 'PBXProject', attributes={'BuildIndependentTargetsInParallel': 'YES', 'LastUpgradeCheck': '2600',
     'TargetAttributes': {target_ids['CalendarShowcaseTests']: {'TestTargetID': target_ids['CalendarShowcase']},
                          target_ids['CalendarShowcaseUITests']: {'TestTargetID': target_ids['CalendarShowcase']}}},
@@ -127,7 +156,7 @@ obj('project', 'PBXProject', attributes={'BuildIndependentTargetsInParallel': 'Y
         'GCC_C_LANGUAGE_STANDARD': 'gnu17', 'CLANG_CXX_LANGUAGE_STANDARD': 'gnu++20', 'DEBUG_INFORMATION_FORMAT': 'dwarf-with-dsym'}),
     compatibilityVersion='Xcode 14.0', developmentRegion='en', hasScannedForEncodings=0,
     knownRegions=['en', 'Base'], mainGroup=root_group, productRefGroup=product_group,
-    projectDirPath='', projectRoot='', targets=targets)
+    projectDirPath='', projectRoot='', targets=targets, packageReferences=[local_package])
 
 def serialize(value, indent=0):
     if isinstance(value, dict):
@@ -140,7 +169,7 @@ PROJECT.mkdir(parents=True, exist_ok=True)
 (PROJECT / 'project.pbxproj').write_text('// !$*UTF8*$!\n' + serialize({'archiveVersion': 1, 'classes': {}, 'objectVersion': 56, 'objects': objects, 'rootObject': oid('project')}) + '\n')
 
 def build_ref(name):
-    extension = 'app' if name == 'CalendarShowcase' else 'xctest'
+    extension = 'app' if name in ['CalendarShowcase', 'CalendarShowcaseMac'] else 'xctest'
     return f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{target_ids[name]}" BuildableName="{name}.{extension}" BlueprintName="{name}" ReferencedContainer="container:CalendarShowcase.xcodeproj"/>'
 
 scheme_dir = PROJECT / 'xcshareddata/xcschemes'
@@ -174,3 +203,10 @@ test_plan = {
 }
 (ROOT / 'Example/CalendarShowcase.xctestplan').write_text(json.dumps(test_plan, indent=2) + '\n')
 print(PROJECT)
+
+(scheme_dir / 'CalendarShowcaseMac.xcscheme').write_text(scheme.replace(build_ref('CalendarShowcase'), build_ref('CalendarShowcaseMac')).replace('container:CalendarShowcase.xctestplan', 'container:CalendarShowcaseMac.xctestplan'))
+mac_plan = {'configurations': [{'id': '07291528-7803-4137-8147-74039C565809', 'name': 'Native AppKit', 'options': {}}],
+    'defaultOptions': test_plan['defaultOptions'], 'version': 1,
+    'testTargets': [{'parallelizable': False, 'target': {'containerPath': 'container:CalendarShowcase.xcodeproj',
+        'identifier': target_ids[name], 'name': name}} for name in ['CalendarShowcaseMacTests', 'CalendarShowcaseMacUITests']]}
+(ROOT / 'Example/CalendarShowcaseMac.xctestplan').write_text(json.dumps(mac_plan, indent=2) + '\n')

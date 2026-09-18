@@ -1,3 +1,4 @@
+import CalendarDemoSupport
 import UIKit
 import XCTest
 import FSCalendarCore
@@ -5,7 +6,7 @@ import FSCalendar
 @testable import CalendarShowcase
 
 final class SharedDriverTests: XCTestCase {
-    @MainActor private func host(_ driver: any CalendarDemoDriver) -> UIWindow {
+    @MainActor private func host(_ driver: any UIKitCalendarDemoDriver) -> UIWindow {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let controller = UIViewController(); window.rootViewController = controller
         controller.view.addSubview(driver.view)

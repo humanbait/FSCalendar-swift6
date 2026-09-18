@@ -1,3 +1,4 @@
+import CalendarDemoSupport
 import XCTest
 @testable import CalendarShowcase
 
