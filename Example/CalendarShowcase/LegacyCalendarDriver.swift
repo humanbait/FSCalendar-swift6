@@ -4,12 +4,13 @@ import UIKit
 
 @MainActor
 final class LegacyCalendarDriver: NSObject, UIKitCalendarDemoDriver, @preconcurrency FSCalendarDataSource, @preconcurrency FSCalendarDelegate, @preconcurrency FSCalendarDelegateAppearance {
-    let calendar = FSCalendarLegacy.FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 320))
+    let calendar = LegacyFixtureCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 320))
     let scenario: DemoScenario
     var onChange: (() -> Void)?
     var onHeightChange: ((CGFloat, Bool) -> Void)?
     private(set) var events: [String] = []
     var view: UIView { calendar }
+    var initialHeight: CGFloat { scenario == .week ? 120 : (scenario == .continuous ? 400 : 320) }
     var state: DemoState {
         DemoState(page: calendar.currentPage, scope: calendar.scope == .month ? "month" : "week",
                   selection: calendar.selectedDates, events: events)
@@ -50,6 +51,12 @@ final class LegacyCalendarDriver: NSObject, UIKitCalendarDemoDriver, @preconcurr
             calendar.appearance.headerTitleFont = .systemFont(ofSize: 25, weight: .semibold)
         }
         if [.custom, .range].contains(scenario) { calendar.register(DemoLegacyCell.self, forCellReuseIdentifier: "custom") }
+        // Legacy scope and continuous scrolling need a valid layout before positioning the fixture.
+        calendar.layoutIfNeeded()
+        if scenario == .continuous {
+            // Legacy updates the visible continuous month only after attachment to a window.
+            calendar.onInitialWindowLayout = { [weak self] in self?.reset() }
+        }
         reset()
     }
 
@@ -154,5 +161,22 @@ final class DemoLegacyCell: FSCalendarCell {
         super.configureAppearance()
         shapeLayer.path = UIBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 4), cornerRadius: 8).cgPath
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+    }
+}
+
+@MainActor final class LegacyFixtureCalendar: FSCalendarLegacy.FSCalendar {
+    var onInitialWindowLayout: (() -> Void)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil, onInitialWindowLayout != nil { setNeedsLayout() }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard window != nil, let initialize = onInitialWindowLayout else { return }
+        onInitialWindowLayout = nil
+        subviews.forEach { $0.layoutIfNeeded() }
+        initialize()
     }
 }

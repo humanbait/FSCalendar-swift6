@@ -10,6 +10,7 @@ import FSCalendarCore
     var onHeightChange: ((CGFloat, Bool) -> Void)?
     private(set) var events: [String] = []
     var view: UIView { calendar }
+    var initialHeight: CGFloat { scenario == .continuous ? 400 : calendar.preferredHeight }
     var state: DemoState {
         DemoState(page: (try? calendar.currentPage.date(in: DemoFixtures.calendar.timeZone)) ?? DemoFixtures.initialDate,
                   scope: calendar.displayMode.scope.rawValue, selection: calendar.selectedDates, events: events)

@@ -9,6 +9,12 @@ import FSCalendarCore
 
 @MainActor private final class CalendarSpy: FSCalendarDelegate {
     var changes: [SelectionChange] = []
+    var heights: [CGFloat] = []
+    var onHeight: (() -> Void)?
+    func calendar(_ calendar: FSCalendar, preferredHeightDidChange height: CGFloat, animated: Bool) {
+        heights.append(height)
+        onHeight?()
+    }
     var allow = true
     var reentrantError: CalendarError?
     var attemptReentry = false
@@ -24,6 +30,57 @@ import FSCalendarCore
 extension FSCalendar: RendererSelectionContract {}
 
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testHeightNotificationsTrackDelegateIdentityAndPreventReentrantDuplicates() throws {
+        let view = try make()
+        let first = CalendarSpy(), second = CalendarSpy()
+        view.delegate = first
+        first.onHeight = { [weak view] in view?.notifyHeight(animated: false) }
+        view.notifyHeight(animated: false)
+        view.notifyHeight(animated: true)
+        view.delegate = first
+        view.notifyHeight(animated: false)
+        XCTAssertEqual(first.heights, [view.preferredHeight])
+        view.delegate = second
+        view.notifyHeight(animated: false)
+        XCTAssertEqual(second.heights, [view.preferredHeight])
+        view.delegate = nil
+        view.notifyHeight(animated: false)
+        view.delegate = second
+        view.notifyHeight(animated: false)
+        XCTAssertEqual(second.heights.count, 2)
+    }
+
+    @MainActor func testHeightNotificationsPreserveScopeAndInteractiveCancellation() throws {
+        let view = try make(), spy = CalendarSpy()
+        view.delegate = spy
+        view.notifyHeight(animated: false)
+        let monthHeight = view.preferredHeight
+        try view.setDisplayMode(.week, animated: false)
+        let weekHeight = view.preferredHeight
+        XCTAssertLessThan(weekHeight, monthHeight)
+        try view.setDisplayMode(.month(.horizontal), animated: false)
+        XCTAssertEqual(spy.heights, [monthHeight, weekHeight, monthHeight])
+        try view.beginInteractiveTransition(to: .week)
+        view.updateInteractiveTransition(progress: 0.5)
+        let middleHeight = view.preferredHeight
+        view.updateInteractiveTransition(progress: 0.5)
+        view.finishInteractiveTransition(commit: false, animated: false)
+        XCTAssertEqual(spy.heights, [monthHeight, weekHeight, monthHeight, middleHeight, monthHeight])
+        XCTAssertEqual(view.intrinsicContentSize.height, monthHeight)
+    }
+
+    @MainActor func testVariableRowNavigationDeliversChangedHeight() throws {
+        let view = try make(), spy = CalendarSpy()
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        view.delegate = spy
+        view.notifyHeight(animated: false)
+        let februaryHeight = view.preferredHeight
+        try view.setCurrentPage(CivilDay(year: 2024, month: 3, day: 1), animated: false)
+        let marchHeight = view.preferredHeight
+        XCTAssertGreaterThan(marchHeight, februaryHeight)
+        XCTAssertEqual(spy.heights, [februaryHeight, marchHeight])
+    }
+
     @MainActor func testLegacyCellContentAlignment() throws {
         let day = try CivilDay(year: 2024, month: 2, day: 14)
         let engine = try CalendarEngine(configuration: CalendarConfiguration())
@@ -206,6 +263,8 @@ final class CalendarViewTests: XCTestCase {
         defer { window.isHidden = true }
         parent.addChild(child); parent.view.addSubview(child.view); child.didMove(toParent: parent)
         child.view.addSubview(view)
+        let spy = CalendarSpy(); view.delegate = spy
+        view.notifyHeight(animated: false)
         let before = view.preferredHeight
         let fontSize = view.resolvedAppearance.titleFont.pointSize
         parent.setOverrideTraitCollection(UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge), forChild: child)
@@ -213,6 +272,8 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertEqual(view.traitCollection.preferredContentSizeCategory, .accessibilityExtraExtraExtraLarge)
         XCTAssertGreaterThan(view.resolvedAppearance.titleFont.pointSize, fontSize)
         XCTAssertGreaterThan(view.preferredHeight, before)
+        XCTAssertEqual(spy.heights.last, view.preferredHeight)
+        XCTAssertGreaterThan(spy.heights.count, 1)
         XCTAssertEqual((view.weekdayStack.arrangedSubviews.first as? UILabel)?.accessibilityLabel, "Sunday")
     }
     @MainActor func testInvalidAppearanceDimensionsCannotProduceNonfiniteGeometry() throws {

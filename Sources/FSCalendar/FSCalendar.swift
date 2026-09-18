@@ -4,7 +4,12 @@ import FSCalendarCore
 
 /// A UIKit calendar. All view, provider, delegate, and mutation APIs are main-actor isolated.
 @MainActor public final class FSCalendar: UIView, UICollectionViewDataSource, UICollectionViewDelegate, UIGestureRecognizerDelegate {
-    public weak var delegate: (any FSCalendarDelegate)?
+    public weak var delegate: (any FSCalendarDelegate)? {
+        didSet {
+            if oldValue !== delegate { lastDeliveredHeight = nil }
+        }
+    }
+    private var lastDeliveredHeight: CGFloat?
     public weak var dataSource: (any FSCalendarDataSource)? { didSet { reloadData() } }
     public var appearance = FSCalendarAppearance() { didSet { refreshAppearance() } }
     var resolvedAppearance = FSCalendarAppearance()
@@ -250,7 +255,11 @@ import FSCalendarCore
     }
     func notifyHeight(animated: Bool) {
         invalidateIntrinsicContentSize()
-        delegate?.calendar(self, preferredHeightDidChange: preferredHeight, animated: animated)
+        guard let delegate else { return }
+        let height = preferredHeight
+        guard lastDeliveredHeight != height else { return }
+        lastDeliveredHeight = height
+        delegate.calendar(self, preferredHeightDidChange: height, animated: animated)
     }
     @objc private func clockDidChange() { today = try? CivilDay(date: Date(), timeZone: configuration.timeZone) }
     func grid(in section: Int) -> CalendarGrid? {

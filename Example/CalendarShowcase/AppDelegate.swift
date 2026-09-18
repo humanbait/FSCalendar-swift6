@@ -69,7 +69,6 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
     private let eventLabel = UILabel()
     private let table = UITableView(frame: .zero, style: .plain)
     private var heightConstraint: NSLayoutConstraint!
-    private var didPresentFixture = false
 
     init(scenario: DemoScenario, implementation: String) {
         self.scenario = scenario
@@ -122,7 +121,7 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
                 stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
             ])
         }
-        heightConstraint = driver.view.heightAnchor.constraint(equalToConstant: scenario == .week ? 120 : (scenario == .continuous ? 400 : 320))
+        heightConstraint = driver.view.heightAnchor.constraint(equalToConstant: driver.initialHeight)
         heightConstraint.priority = .defaultHigh
         NSLayoutConstraint.activate([
             controls.heightAnchor.constraint(equalToConstant: 42), heightConstraint,
@@ -156,10 +155,6 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         pageLabel.accessibilityValue = view.bounds.width > view.bounds.height ? "landscape" : "portrait"
-        if !didPresentFixture {
-            didPresentFixture = true
-            driver.reset()
-        }
     }
     override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)

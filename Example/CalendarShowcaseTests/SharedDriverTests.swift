@@ -6,12 +6,93 @@ import FSCalendar
 @testable import CalendarShowcase
 
 final class SharedDriverTests: XCTestCase {
+    @MainActor private func makeWindow() -> UIWindow {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first!
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        return window
+    }
+
+    @MainActor func testNavigationKeepsInitialCalendarHeight() {
+        let window = (UIApplication.shared.delegate as! AppDelegate).window!
+        let originalRoot = window.rootViewController
+        defer {
+            window.rootViewController = originalRoot
+            window.makeKeyAndVisible()
+        }
+        for scenario in [DemoScenario.month, .week, .variable, .continuous] {
+            let page = ScenarioController(scenario: scenario, implementation: "swift")
+            let navigation = UINavigationController(rootViewController: page)
+            navigation.loadViewIfNeeded()
+            navigation.view.frame = window.bounds
+            navigation.view.layoutIfNeeded()
+            page.view.layoutIfNeeded()
+            let initialHeight = page.driver.view.bounds.height
+            let calendar = (page.driver as! SwiftCalendarDriver).calendar
+            let expectedHeight: CGFloat = scenario == .continuous ? 400 : calendar.preferredHeight
+            XCTAssertEqual(initialHeight, expectedHeight, accuracy: 0.5, scenario.rawValue)
+            func capture(_ stage: String) {
+                let image = UIGraphicsImageRenderer(bounds: navigation.view.bounds).image { context in
+                    navigation.view.layer.render(in: context.cgContext)
+                }
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "\(scenario.rawValue)-\(stage)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+            capture("before-appearance")
+            func pageStateLabel(in view: UIView) -> UIView? {
+                if view.accessibilityIdentifier == "page-state" { return view }
+                return view.subviews.lazy.compactMap { pageStateLabel(in: $0) }.first
+            }
+            let stateLabel = pageStateLabel(in: page.view)!
+            func waitForAppearance() {
+                let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    MainActor.assumeIsolated { stateLabel.accessibilityValue == "portrait" }
+                }, object: nil)
+                wait(for: [appeared], timeout: 3)
+            }
+            window.rootViewController = navigation
+            window.makeKeyAndVisible()
+            waitForAppearance()
+            navigation.view.layoutIfNeeded()
+            capture("after-appearance")
+            XCTAssertEqual(page.driver.view.bounds.height, initialHeight, accuracy: 0.5, scenario.rawValue)
+            page.driver.select(DemoFixtures.initialDate)
+            let selection = page.driver.state.selection
+            let cover = AppearanceController()
+            let covered = expectation(description: "Cover appeared")
+            cover.onAppear = { covered.fulfill() }
+            navigation.pushViewController(cover, animated: false)
+            wait(for: [covered], timeout: 3)
+            stateLabel.accessibilityValue = nil
+            navigation.popViewController(animated: false)
+            waitForAppearance()
+            navigation.view.layoutIfNeeded()
+            XCTAssertEqual(page.driver.view.bounds.height, initialHeight, accuracy: 0.5)
+            XCTAssertEqual(page.driver.state.selection, selection)
+            window.rootViewController = nil
+        }
+    }
+
+    @MainActor func testSwiftResetsAndFixedRowNavigationDoNotRepeatHeightCallbacks() throws {
+        let driver = SwiftCalendarDriver(scenario: .month)
+        let window = host(driver)
+        defer { window.isHidden = true }
+        var heights: [CGFloat] = []
+        driver.onHeightChange = { height, _ in heights.append(height) }
+        driver.reset(); driver.reset()
+        try driver.calendar.setCurrentPage(DemoFixtures.date("2024-03-01"), animated: false)
+        driver.reset()
+        XCTAssertTrue(heights.isEmpty)
+    }
+
     @MainActor private func host(_ driver: any UIKitCalendarDemoDriver) -> UIWindow {
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let window = makeWindow()
         let controller = UIViewController(); window.rootViewController = controller
         controller.view.addSubview(driver.view)
-        driver.view.frame = CGRect(x: 0, y: 50, width: 390, height: 320)
-        window.makeKeyAndVisible(); driver.view.layoutIfNeeded(); driver.reset(); driver.view.layoutIfNeeded()
+        driver.view.frame = CGRect(x: 0, y: 50, width: 390, height: driver.initialHeight)
+        window.makeKeyAndVisible(); driver.view.layoutIfNeeded()
         return window
     }
     @MainActor func testEveryImplementationAndScenarioRendersTheFixture() {
@@ -73,5 +154,13 @@ final class SharedDriverTests: XCTestCase {
         let neighborDay = try CivilDay(year: 2024, month: 2, day: 15)
         let neighbor = try XCTUnwrap(visible.first { $0.dayState?.occurrence.day == neighborDay })
         XCTAssertNil(neighbor.dayImageView.image)
+    }
+}
+
+@MainActor private final class AppearanceController: UIViewController {
+    var onAppear: (() -> Void)?
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        onAppear?()
     }
 }
