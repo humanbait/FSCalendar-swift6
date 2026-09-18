@@ -31,7 +31,7 @@ Idle, interactive, and settling states retain source/target mode, source/target 
 
 Accepted additions to the selection bounce visible selection circles for 0.15 seconds, including programmatic selection. Reloading existing selection does not replay the animation. Deselection and reuse clear it.
 
-Variable-row month height changes and month/week scope transitions use 0.3-second ease-in-out animation. Scope transitions keep the focused row opaque while surrounding rows fade; interactive dragging drives height, row position, and opacity together. Reduce Motion and nonanimated requests apply final geometry immediately.
+Variable-row month height changes and month/week scope transitions use 0.3-second ease-in-out animation. Paged swipes update the destination page and start resizing at drag release, alongside deceleration; scroll completion only reconciles an interrupted or changed destination. Scope transitions keep the focused row opaque while surrounding rows fade; interactive dragging drives height, row position, and opacity together. Reduce Motion and nonanimated requests apply final geometry immediately.
 
 In `calendar(_:preferredHeightDidChange:animated:)`, update the application's height constraint and call its container's `layoutIfNeeded()` synchronously. Animated notifications run inside the calendar's animation context; starting another animation in the delegate can desynchronize the surrounding layout. Interactive notifications carry `animated == false`. Identical heights remain suppressed per delegate, and initial layout uses `preferredHeight` directly.
 

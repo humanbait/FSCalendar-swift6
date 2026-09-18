@@ -44,6 +44,7 @@ import FSCalendarCore
     var transition: CalendarTransition?
     var isMutating = false
     var isLayingOut = false
+    private var isResolvingPageSwipe = false
     var needsPagePosition = true
     var lastBoundsSize = CGSize.zero
     let calendarLayout = CalendarCollectionLayout()
@@ -193,7 +194,7 @@ import FSCalendarCore
         let isRTL = effectiveUserInterfaceLayoutDirection == .rightToLeft
         if calendarLayout.isRTL != isRTL { updateWeekdays(); needsPagePosition = true }
         calendarLayout.isRTL = isRTL
-        if needsPagePosition || needsRepositionForSize {
+        if needsPagePosition || (needsRepositionForSize && !isResolvingPageSwipe) {
             let renderedPage = transition?.renderPage ?? page
             if let section = try? engine.sectionIndex(for: renderedPage, scope: renderingMode.scope) {
                 collectionView.layoutIfNeeded()
@@ -345,11 +346,31 @@ import FSCalendarCore
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         if renderingMode.isContinuous { updatePageFromScroll() }
     }
+    public func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint,
+                                         targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        guard !renderingMode.isContinuous, transition == nil, !isLayingOut, !needsPagePosition else { return }
+        // Commit the predicted page before deceleration, so resizing runs alongside the remaining scroll.
+        let section = calendarLayout.section(at: targetContentOffset.pointee)
+        let previousExtent = collectionView.bounds.height
+        let previousOffset = collectionView.contentOffset
+        isResolvingPageSwipe = true
+        defer { isResolvingPageSwipe = false }
+        updatePageFromScroll(at: targetContentOffset.pointee)
+        if !renderingMode.isHorizontal, previousExtent > 0, collectionView.bounds.height != previousExtent {
+            // Keep the same fractional page position when vertical page geometry changes.
+            let offset = CGPoint(x: previousOffset.x, y: previousOffset.y / previousExtent * collectionView.bounds.height)
+            UIView.performWithoutAnimation { self.collectionView.setContentOffset(offset, animated: false) }
+        }
+        targetContentOffset.pointee = calendarLayout.offset(for: section)
+    }
+    public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { updatePageFromScroll() }
+    }
     public func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { updatePageFromScroll() }
     public func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) { updatePageFromScroll() }
-    func updatePageFromScroll() {
+    func updatePageFromScroll(at offset: CGPoint? = nil) {
         guard !isLayingOut, !needsPagePosition, transition == nil, collectionView.bounds.width > 0 else { return }
-        let section = calendarLayout.section(at: collectionView.contentOffset)
+        let section = calendarLayout.section(at: offset ?? collectionView.contentOffset)
         guard let next = try? engine.page(at: section, scope: mode.scope).anchor, next != page else { return }
         let previousHeight = preferredHeight
         page = next; updateHeader(); updatePageHeight(from: previousHeight, animated: true)

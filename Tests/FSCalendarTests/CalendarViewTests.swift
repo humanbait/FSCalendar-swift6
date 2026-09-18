@@ -10,6 +10,8 @@ import FSCalendarCore
 @MainActor private final class CalendarSpy: FSCalendarDelegate {
     var changes: [SelectionChange] = []
     var heights: [CGFloat] = []
+    var pages: [CivilDay] = []
+    func calendarCurrentPageDidChange(_ calendar: FSCalendar) { pages.append(calendar.currentPage) }
     var onHeight: (() -> Void)?
     func calendar(_ calendar: FSCalendar, preferredHeightDidChange height: CGFloat, animated: Bool) {
         heights.append(height)
@@ -60,6 +62,16 @@ final class CalendarViewTests: XCTestCase {
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: nil)
         expectation.expectationDescription = description
         wait(for: [expectation], timeout: 3)
+    }
+
+    @MainActor private func waitForAnimationFrame(_ description: String, _ condition: @escaping @MainActor () -> Bool) {
+        let matched = expectation(description: description)
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 120, repeats: true) { timer in
+            let isMatched = MainActor.assumeIsolated { condition() }
+            if isMatched { timer.invalidate(); matched.fulfill() }
+        }
+        defer { timer.invalidate() }
+        wait(for: [matched], timeout: 3)
     }
 
     @MainActor func testSelectionBounceOnlyForAcceptedAdditionsAndClearsOnReuse() throws {
@@ -194,6 +206,108 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertNil(view.layer.animation(forKey: "bounds.size"))
         try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
         try view.setCurrentPage(CivilDay(year: 2024, month: 2, day: 1), animated: false)
+        XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
+        XCTAssertNil(view.layer.animation(forKey: "bounds.size"))
+    }
+
+    @MainActor func testSwipeReleaseStartsHeightChangeBeforeScrollingEnds() throws {
+        for rtl in [false, true] {
+            let view = try make()
+            view.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+            try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+            let (window, spy) = hostForAnimation(view)
+            defer { window.isHidden = true }
+            for month in [3, 2] {
+                let sourceHeight = view.preferredHeight
+                let sourceOffset = view.collectionView.contentOffset
+                let target = try CivilDay(year: 2024, month: month, day: 1)
+                let section = try view.engine.sectionIndex(for: target, scope: .month)
+                var offset = view.calendarLayout.offset(for: section)
+                let releaseOffset = CGPoint(x: sourceOffset.x + (offset.x - sourceOffset.x) * 0.6, y: 0)
+                view.collectionView.setContentOffset(releaseOffset, animated: false)
+                spy.pages.removeAll(); spy.heights.removeAll()
+                view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &offset)
+                let targetHeight = view.preferredHeight
+                XCTAssertNotEqual(sourceHeight, targetHeight)
+                XCTAssertEqual(view.currentPage, target)
+                XCTAssertEqual(spy.pages, [target])
+                XCTAssertEqual(spy.heights, [targetHeight])
+                XCTAssertEqual(view.collectionView.contentOffset.x, releaseOffset.x, accuracy: 0.5)
+                // Model the remaining UIScrollView deceleration and observe both presentations together.
+                view.collectionView.setContentOffset(offset, animated: true)
+                waitForAnimationFrame("Page and height animate concurrently") {
+                    guard let height = view.layer.presentation()?.bounds.height,
+                          let x = view.collectionView.layer.presentation()?.bounds.origin.x else { return false }
+                    return height > min(sourceHeight, targetHeight) + 0.1 && height < max(sourceHeight, targetHeight) - 0.1 &&
+                        x > min(releaseOffset.x, offset.x) + 0.1 && x < max(releaseOffset.x, offset.x) - 0.1
+                }
+                waitUntil("Page finishes scrolling") { abs(view.collectionView.contentOffset.x - offset.x) < 0.1 }
+                view.scrollViewDidEndDecelerating(view.collectionView)
+                XCTAssertEqual(spy.pages, [target])
+                XCTAssertEqual(spy.heights, [targetHeight])
+            }
+        }
+    }
+
+    @MainActor func testSwipeReversalAndNondeceleratingReleaseReconcileWithoutDuplicateCallbacks() throws {
+        let view = try make()
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        let february = view.currentPage, sourceOffset = view.collectionView.contentOffset
+        var samePage = sourceOffset
+        view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &samePage)
+        view.scrollViewDidEndDragging(view.collectionView, willDecelerate: false)
+        XCTAssertTrue(spy.pages.isEmpty); XCTAssertTrue(spy.heights.isEmpty)
+        let march = try CivilDay(year: 2024, month: 3, day: 1)
+        var target = view.calendarLayout.offset(for: try view.engine.sectionIndex(for: march, scope: .month))
+        view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &target)
+        var reverse = sourceOffset
+        view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &reverse)
+        view.scrollViewDidEndDragging(view.collectionView, willDecelerate: false)
+        view.scrollViewDidEndDecelerating(view.collectionView)
+        XCTAssertEqual(spy.pages, [march, february])
+        XCTAssertEqual(spy.heights.count, 2)
+        XCTAssertEqual(view.currentPage, february)
+    }
+
+    @MainActor func testVerticalSwipeRemapsDestinationAndPreservesFractionalPosition() throws {
+        let view = try make()
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        try view.setDisplayMode(.month(.vertical), animated: false)
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        for month in [3, 2] {
+            let section = try view.engine.sectionIndex(for: CivilDay(year: 2024, month: month, day: 1), scope: .month)
+            let previousExtent = view.collectionView.bounds.height
+            let fraction = CGFloat(section) + (month == 3 ? -0.4 : 0.4)
+            view.collectionView.setContentOffset(CGPoint(x: 0, y: fraction * previousExtent), animated: false)
+            var target = view.calendarLayout.offset(for: section)
+            view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &target)
+            XCTAssertNotEqual(view.collectionView.bounds.height, previousExtent)
+            XCTAssertEqual(view.collectionView.contentOffset.y / view.collectionView.bounds.height, fraction, accuracy: 0.001)
+            XCTAssertEqual(target.y, view.calendarLayout.offset(for: section).y, accuracy: 0.001)
+            let count = spy.pages.count
+            view.collectionView.setContentOffset(target, animated: false)
+            view.scrollViewDidEndDecelerating(view.collectionView)
+            XCTAssertEqual(spy.pages.count, count)
+            XCTAssertEqual(view.currentPage.month, month)
+        }
+    }
+
+    @MainActor func testFixedRowSwipeOnlyNotifiesPageAndReduceMotionIsImmediate() throws {
+        let view = try make()
+        view.reduceMotionOverride = true
+        let (window, spy) = hostForAnimation(view)
+        defer { window.isHidden = true }
+        view.notifyHeight(animated: false); spy.heights.removeAll()
+        let march = try CivilDay(year: 2024, month: 3, day: 1)
+        var target = view.calendarLayout.offset(for: try view.engine.sectionIndex(for: march, scope: .month))
+        view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &target)
+        XCTAssertEqual(spy.pages, [march]); XCTAssertTrue(spy.heights.isEmpty)
+        try view.apply(configuration: CalendarConfiguration(placeholders: .variable, timeZone: TimeZone(secondsFromGMT: 0)!))
+        var february = view.calendarLayout.offset(for: try view.engine.sectionIndex(for: CivilDay(year: 2024, month: 2, day: 1), scope: .month))
+        view.scrollViewWillEndDragging(view.collectionView, withVelocity: .zero, targetContentOffset: &february)
         XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
         XCTAssertNil(view.layer.animation(forKey: "bounds.size"))
     }

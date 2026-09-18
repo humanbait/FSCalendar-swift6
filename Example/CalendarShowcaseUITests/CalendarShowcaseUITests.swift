@@ -25,6 +25,24 @@ final class CalendarShowcaseUITests: XCTestCase {
             }
         }
     }
+    @MainActor func testSwipeHeightParity() {
+        let app = launch("dynamicHeight")
+        let grid = app.collectionViews["calendar-grid"]
+        XCTAssertTrue(grid.waitForExistence(timeout: 5))
+        for _ in 0..<2 {
+            grid.swipeLeft()
+            wait(app.staticTexts["page-state"], contains: "2024-03")
+            XCTAssertTrue(day(app, "2024-03-14").isHittable)
+            grid.swipeRight()
+            wait(app.staticTexts["page-state"], contains: "2024-02")
+            XCTAssertTrue(day(app, "2024-02-14").isHittable)
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "\(implementation)-swipe-height-restored"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     @MainActor func testAnimationParity() {
         XCTContext.runActivity(named: "\(implementation): selection and scope") { _ in
             let app = launch("scope")
