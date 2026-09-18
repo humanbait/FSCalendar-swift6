@@ -16,6 +16,7 @@ import FSCalendarCore
         while recency.count > 9 { cache.removeValue(forKey: recency.removeFirst()) }
         return grid
     }
+    func collectionView(_ collectionView: NSCollectionView, shouldSelectItemsAt indexPaths: Set<IndexPath>) -> Set<IndexPath> { [] }
     func numberOfSections(in collectionView: NSCollectionView) -> Int { owner?.calendarLayout.rows.count ?? 0 }
     func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
         guard let rows = owner?.calendarLayout.rows, rows.indices.contains(section) else { return 0 }

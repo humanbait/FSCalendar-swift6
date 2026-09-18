@@ -9,18 +9,26 @@ import FSCalendarCore
     public var calendarAppearance = FSCalendarAppearance() { didSet { rebuild() } }
     public var today: CivilDay? { didSet { reload(dates: Set([oldValue, today].compactMap { $0 })) } }
     public var configuration: CalendarConfiguration { engine.configuration }
+    public var selectedDays: [CivilDay] { selection.days }
+    public var selectedDate: Date? { selection.latest.flatMap { try? $0.date(in: configuration.timeZone) } }
+    public var selectedDates: [Date] { selectedDays.compactMap { try? $0.date(in: configuration.timeZone) } }
+    public private(set) var focusedDay: CivilDay?
+    public var swipeSelectionEnabled = false
     public var currentPage: CivilDay { page }
     public var displayMode: CalendarDisplayMode { mode }
     public var preferredHeight: CGFloat { height(for: page) }
     public override var isFlipped: Bool { true }
     public override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: preferredHeight) }
     public override var fittingSize: NSSize { NSSize(width: bounds.width, height: preferredHeight) }
+    var selection = SelectionState()
+    var isMutating = false
+    let input = CalendarInputController()
     var engine = try! CalendarEngine(configuration: CalendarConfiguration())
     var page = try! CivilDay(year: 1970, month: 1, day: 1)
     var mode: CalendarDisplayMode = .month(.horizontal)
     let calendarLayout = CalendarCollectionLayout()
-    let collectionView = NSCollectionView()
-    let scrollView = NSScrollView()
+    let collectionView = CalendarCollectionView()
+    let scrollView = CalendarScrollView()
     let titleLabel = NSTextField(labelWithString: "")
     let weekdayLabels = (0..<7).map { _ in NSTextField(labelWithString: "") }
     let controller = CalendarCollectionController()
@@ -35,11 +43,14 @@ import FSCalendarCore
         wantsLayer = true
         today = try? CivilDay(date: Date(), timeZone: configuration.timeZone)
         page = engine.pageID(containing: clamped(today ?? configuration.minimumDate), scope: .month).anchor
-        controller.owner = self
+        controller.owner = self; input.owner = self
+        collectionView.autoresizingMask = []
         collectionView.collectionViewLayout = calendarLayout; collectionView.dataSource = controller; collectionView.delegate = controller
-        collectionView.isSelectable = false; collectionView.backgroundColors = [.clear]
+        collectionView.isSelectable = true; collectionView.allowsMultipleSelection = true; collectionView.backgroundColors = [.clear]
         collectionView.register(FSCalendarItem.self, forItemWithIdentifier: NSUserInterfaceItemIdentifier("default"))
         collectionView.setAccessibilityIdentifier("calendar-grid")
+        scrollView.hasHorizontalScroller = true; scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true; scrollView.scrollerStyle = .overlay
         scrollView.documentView = collectionView
         scrollView.drawsBackground = false; scrollView.borderType = .noBorder
         addSubview(scrollView); addSubview(titleLabel)
@@ -48,17 +59,25 @@ import FSCalendarCore
         setAccessibilityIdentifier("calendar"); rebuild()
     }
     public func apply(configuration: CalendarConfiguration) throws {
-        engine = try CalendarEngine(configuration: configuration)
+        guard !isMutating else { throw CalendarError.reentrantMutation }
+        let replacement = try CalendarEngine(configuration: configuration)
+        isMutating = true; defer { isMutating = false }
+        let change = selection.pruningChange(for: replacement)
+        engine = replacement
+        if let change { selection.commit(change) }
         let oldPage = page
         page = engine.pageID(containing: clamped(page), scope: mode.scope).anchor
-        rebuild()
+        reconcileFocus(); rebuild()
+        if let change { delegate?.calendar(self, didChangeSelection: change) }
         if oldPage != page { delegate?.calendarCurrentPageDidChange(self) }
     }
+
     public func setCurrentPage(_ day: CivilDay, animated: Bool = false) throws {
+        guard !isMutating else { throw CalendarError.reentrantMutation }
         let index = try engine.sectionIndex(for: day, scope: mode.scope)
         let next = try engine.page(at: index, scope: mode.scope).anchor
         let changed = next != page
-        page = next; needsPagePosition = true
+        page = next; reconcileFocus(); needsPagePosition = true
         updateHeader(); notifyHeight(animated: animated)
         needsLayout = true; layoutSubtreeIfNeeded()
         if changed { delegate?.calendarCurrentPageDidChange(self) }
@@ -72,6 +91,61 @@ import FSCalendarCore
         guard !overflow else { throw CalendarError.invalidPageIndex(offset) }
         try setCurrentPage(engine.page(at: next, scope: mode.scope).anchor, animated: animated)
     }
+    public func select(_ day: CivilDay) throws {
+        try setSelection(configuration.selectionMode == .multiple ? selectedDays + [day] : [day])
+    }
+    public func select(_ date: Date) throws { try select(CivilDay(date: date, timeZone: configuration.timeZone)) }
+    public func deselect(_ day: CivilDay) throws { try setSelection(selectedDays.filter { $0 != day }) }
+    public func clearSelection() throws { try setSelection([]) }
+    public func setSelection(_ days: [CivilDay]) throws { try transact(days, origin: .programmatic) }
+    func transact(_ days: [CivilDay], origin: SelectionOrigin) throws {
+        guard !isMutating else { throw CalendarError.reentrantMutation }
+        isMutating = true; defer { isMutating = false }
+        guard let change = try selection.propose(days, engine: engine, origin: origin) else { return }
+        guard delegate?.calendar(self, shouldApply: change) ?? true else { throw CalendarError.selectionVetoed }
+        selection.commit(change); reload(dates: Set(change.added + change.removed))
+        delegate?.calendar(self, didChangeSelection: change)
+    }
+    public func focus(_ day: CivilDay) throws {
+        guard !isMutating else { throw CalendarError.reentrantMutation }
+        guard day >= configuration.minimumDate, day <= configuration.maximumDate else { throw CalendarError.outOfBounds(day) }
+        _ = try day.date(in: configuration.timeZone)
+        if engine.pageID(containing: day, scope: mode.scope).anchor != page { try setCurrentPage(day) }
+        let old = focusedDay; focusedDay = day
+        reload(dates: Set([old, day].compactMap { $0 }))
+        NSAccessibility.post(element: self, notification: .focusedUIElementChanged)
+    }
+    func firstEligibleDay() -> CivilDay {
+        (try? engine.grid(containing: page, scope: mode.scope))?.occurrences.first { $0.isSelectable && $0.position == .current }?.day ?? clamped(page)
+    }
+    func reconcileFocus() {
+        guard let focusedDay else { return }
+        if !engine.isSelectable(focusedDay) || engine.pageID(containing: focusedDay, scope: mode.scope).anchor != page {
+            self.focusedDay = firstEligibleDay()
+        }
+    }
+    public override var acceptsFirstResponder: Bool { true }
+    public override func becomeFirstResponder() -> Bool {
+        if focusedDay == nil { focusedDay = firstEligibleDay() }
+        reload(dates: Set([focusedDay].compactMap { $0 })); return true
+    }
+    public override func resignFirstResponder() -> Bool { reload(dates: Set([focusedDay].compactMap { $0 })); return true }
+    public override func keyDown(with event: NSEvent) {
+        let rtl = userInterfaceLayoutDirection == .rightToLeft
+        switch event.keyCode {
+        case 123: input.moveFocus(rtl ? 1 : -1)
+        case 124: input.moveFocus(rtl ? -1 : 1)
+        case 125: input.moveFocus(7)
+        case 126: input.moveFocus(-7)
+        case 49: input.activate(focusedDay ?? firstEligibleDay())
+        case 116: try? navigate(-1)
+        case 121: try? navigate(1)
+        case 48:
+            if event.modifierFlags.contains(.shift) { window?.selectPreviousKeyView(self) }
+            else { window?.selectNextKeyView(self) }
+        default: super.keyDown(with: event)
+        }
+    }
     public func reloadData() { controller.cache.removeAll(); controller.recency.removeAll(); collectionView.reloadData(); needsLayout = true }
     public func reload(dates: Set<CivilDay>) {
         for case let item as FSCalendarItem in collectionView.visibleItems() {
@@ -83,8 +157,13 @@ import FSCalendarCore
         if content.accessibilityLabel == nil {
             content.accessibilityLabel = (try? occurrence.day.date(in: configuration.timeZone)).map { formatter("EEEE, MMMM d, yyyy").string(from: $0) }
         }
-        item.apply(content: content, state: DayState(occurrence: occurrence, isSelected: false, isToday: occurrence.day == today),
+        item.apply(content: content, state: DayState(occurrence: occurrence, isSelected: selection.contains(occurrence.day), isToday: occurrence.day == today),
             appearance: metrics, style: dataSource?.calendar(self, appearanceFor: occurrence.day) ?? DayAppearance())
+        (item.view as? CalendarDayView)?.owner = self
+        item.view.layer?.borderWidth = focusedDay == occurrence.day && window?.firstResponder === self ? 2 : 0
+        item.view.layer?.borderColor = NSColor.keyboardFocusIndicatorColor.cgColor
+        item.view.layer?.cornerRadius = 4
+
     }
     func clamped(_ day: CivilDay) -> CivilDay { min(configuration.maximumDate, max(configuration.minimumDate, day)) }
     func rowCount(_ day: CivilDay) -> Int {
@@ -116,6 +195,9 @@ import FSCalendarCore
         }
         layer?.backgroundColor = appearance.backgroundColor.cgColor
     }
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow(); needsPagePosition = true; needsLayout = true
+    }
     public override func layout() {
         super.layout()
         guard !isLayingOut else { return }; isLayingOut = true; defer { isLayingOut = false }
@@ -126,10 +208,14 @@ import FSCalendarCore
         }
         let top = appearance.headerHeight + appearance.weekdayHeight
         scrollView.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(1, bounds.height - top))
-        calendarLayout.viewport = scrollView.contentSize
-        calendarLayout.isRTL = userInterfaceLayoutDirection == .rightToLeft
-        calendarLayout.invalidateLayout()
-        collectionView.frame.size = calendarLayout.collectionViewContentSize
+        if calendarLayout.viewport != scrollView.contentSize || calendarLayout.isRTL != (userInterfaceLayoutDirection == .rightToLeft) {
+            calendarLayout.viewport = scrollView.contentSize
+            calendarLayout.isRTL = userInterfaceLayoutDirection == .rightToLeft
+            calendarLayout.invalidateLayout(); needsPagePosition = true
+        }
+        if collectionView.frame.size != calendarLayout.collectionViewContentSize { collectionView.frame.size = calendarLayout.collectionViewContentSize }
+        scrollView.layoutSubtreeIfNeeded()
+        collectionView.layoutSubtreeIfNeeded()
         if needsPagePosition || lastSize != bounds.size {
             if let section = try? engine.sectionIndex(for: page, scope: mode.scope) {
                 scrollView.contentView.scroll(to: calendarLayout.offset(for: section)); scrollView.reflectScrolledClipView(scrollView.contentView)

@@ -6,12 +6,17 @@ import FSCalendarCore
 @MainActor final class ShowcaseController: NSViewController, FSCalendarDelegate {
     let scenarios = NSPopUpButton(frame: .zero, pullsDown: false)
     let calendar = FSCalendarView(frame: .zero)
-    let readout = NSTextField(wrappingLabelWithString: "")
+    let readout = NSTextField()
     override func loadView() {
-        try! calendar.apply(configuration: CalendarConfiguration(timeZone: DemoFixtures.calendar.timeZone, locale: DemoFixtures.calendar.locale!))
+        try! calendar.apply(configuration: CalendarConfiguration(timeZone: DemoFixtures.calendar.timeZone, locale: DemoFixtures.calendar.locale!, selectionMode: .multiple))
         try! calendar.setCurrentPage(DemoFixtures.initialDate)
         calendar.today = try! CivilDay(date: DemoFixtures.initialDate, timeZone: DemoFixtures.calendar.timeZone)
         calendar.delegate = self
+        calendar.swipeSelectionEnabled = true
+        readout.isEditable = false; readout.isSelectable = true; readout.isBordered = false; readout.drawsBackground = false
+        readout.setAccessibilityRole(.textField)
+        readout.setAccessibilityIdentifier("state.readout")
+        updateReadout()
         view = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 750))
         scenarios.addItems(withTitles: DemoScenario.allCases.map(\.title))
         scenarios.setAccessibilityIdentifier("scenario.selector")
@@ -38,5 +43,7 @@ import FSCalendarCore
             readout.stringValue = "Page: \(calendar.currentPage)"
         } catch { readout.stringValue = "Rejected: \(error)" }
     }
-    func calendarCurrentPageDidChange(_ calendar: FSCalendarView) { readout.stringValue = "Page: \(calendar.currentPage)" }
+    func calendarCurrentPageDidChange(_ calendar: FSCalendarView) { updateReadout() }
+    func calendar(_ calendar: FSCalendarView, didChangeSelection change: SelectionChange) { updateReadout() }
+    private func updateReadout() { readout.stringValue = "Page: \(calendar.currentPage) selected: \(calendar.selectedDays.map(\.description).joined(separator: ","))" }
 }

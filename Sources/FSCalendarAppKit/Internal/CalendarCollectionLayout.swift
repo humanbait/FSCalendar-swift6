@@ -31,6 +31,7 @@ import FSCalendarCore
                          y: CGFloat(indexPath.item / 7) * height, width: width, height: height)
         return a
     }
-    override func shouldInvalidateLayout(forBoundsChange newBounds: NSRect) -> Bool { true }
+    override func shouldInvalidateLayout(forBoundsChange newBounds: NSRect) -> Bool { false }
+    override func targetContentOffset(forProposedContentOffset proposedContentOffset: NSPoint) -> NSPoint { proposedContentOffset }
 }
 #endif

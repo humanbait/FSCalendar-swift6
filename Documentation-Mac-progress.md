@@ -11,3 +11,9 @@ Milestone 2: real NSCollectionView month renderer, reusable day items, localized
 headings, placeholder policies, bounds, navigation and intrinsic height. Package rendering checks
 pass; native hosted/UI results are in artifacts/mac-m2.xcresult. AppKit styling is named
 calendarAppearance because NSView.appearance remains the system light/dark appearance property.
+
+Milestone 3: shared renderer assertions, ordered selection transactions, veto/reentry/no-op rules,
+configuration pruning, focus, mouse toggling, drag painting, keyboard activation and Tab navigation.
+24 package tests, 7 hosted checks and 2 UI checks passed. Actual clicks exposed a document-frame
+sizing bug; the native collection subclass now retains the custom layout's full content extent.
+Evidence: artifacts/mac-m3-document-fixed.xcresult.

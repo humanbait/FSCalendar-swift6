@@ -1,6 +1,9 @@
 #if canImport(UIKit)
 import UIKit
 import XCTest
+#if SWIFT_PACKAGE
+import CalendarContractSupport
+#endif
 import FSCalendarCore
 @testable import FSCalendar
 
@@ -18,7 +21,13 @@ import FSCalendarCore
     func calendar(_ calendar: FSCalendar, didChangeSelection change: SelectionChange) { changes.append(change) }
 }
 
+extension FSCalendar: RendererSelectionContract {}
+
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testSharedSelectionContract() throws {
+        let view = try make(); let spy = CalendarSpy(); view.delegate = spy
+        try SharedRendererAssertions.verifySelection(view, changes: { spy.changes }, allow: { spy.allow = $0 })
+    }
     @MainActor private func make(_ mode: SelectionMode = .single) throws -> FSCalendar {
         let view = FSCalendar(frame: CGRect(x: 0, y: 0, width: 390, height: 340))
         try view.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 0)!, selectionMode: mode))

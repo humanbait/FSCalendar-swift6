@@ -14,7 +14,7 @@ import FSCalendarCore
     private let dots = (0..<3).map { _ in NSView() }
     private var radius: CGFloat?
     public override func loadView() {
-        view = FlippedView(frame: .zero); view.wantsLayer = true
+        view = CalendarDayView(frame: .zero); view.wantsLayer = true
         selectionBackground.wantsLayer = true
         view.addSubview(selectionBackground)
         for label in [titleLabel, subtitleLabel] {
@@ -49,6 +49,7 @@ import FSCalendarCore
         view.setAccessibilityValue(([content.accessibilityValue, state.isSelected ? "selected" : nil,
             state.isToday ? "today" : nil].compactMap { $0 }).joined(separator: ", "))
         view.setAccessibilityEnabled(state.occurrence.isSelectable)
+        (view as? CalendarDayView)?.day = state.occurrence.day
         view.needsLayout = true
     }
     open override func viewDidLayout() {
@@ -70,6 +71,8 @@ import FSCalendarCore
     }
     open override func prepareForReuse() {
         super.prepareForReuse(); dayState = nil; isSelected = false
+        (view as? CalendarDayView)?.owner = nil; (view as? CalendarDayView)?.day = nil
+        view.layer?.borderWidth = 0
         titleLabel.stringValue = ""; subtitleLabel.stringValue = ""; dayImageView.image = nil
         view.setAccessibilityLabel(nil); view.setAccessibilityValue(nil); view.setAccessibilityIdentifier(nil)
         selectionBackground.layer?.backgroundColor = nil; selectionBackground.layer?.borderWidth = 0

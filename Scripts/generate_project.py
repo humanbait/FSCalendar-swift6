@@ -126,7 +126,8 @@ if modern:
 target('CalendarDemoSupport', 'com.apple.product-type.framework', (ROOT / 'Development/DemoSupport').rglob('*.swift'), dependencies=['FSCalendarCore'], frameworks=['FSCalendarCore'])
 libs = ['CalendarDemoSupport', 'FSCalendarLegacy'] + (['FSCalendarCore', 'FSCalendar'] if modern else [])
 target('CalendarShowcase', 'com.apple.product-type.application', (ROOT / 'Example/CalendarShowcase').rglob('*.swift'), dependencies=libs, frameworks=libs)
-unit_paths = list((ROOT / 'Example/CalendarShowcaseTests').rglob('*.swift')) + list((ROOT / 'Example/CalendarShowcaseTests').glob('*.m'))
+contract_paths = list((ROOT / 'Development/ContractSupport').rglob('*.swift'))
+unit_paths = contract_paths + list((ROOT / 'Example/CalendarShowcaseTests').rglob('*.swift')) + list((ROOT / 'Example/CalendarShowcaseTests').glob('*.m'))
 if modern:
     unit_paths += list((ROOT / 'Tests/FSCalendarCoreTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarTests').rglob('*.swift'))
 target('CalendarShowcaseTests', 'com.apple.product-type.bundle.unit-test', unit_paths,
@@ -140,7 +141,7 @@ mac_libs = ['FSCalendarCore', 'FSCalendarAppKit']
 target('CalendarDemoSupportMac', 'com.apple.product-type.framework', (ROOT / 'Development/DemoSupport').rglob('*.swift'), platform='macos')
 target('CalendarShowcaseMac', 'com.apple.product-type.application', (ROOT / 'Example/CalendarShowcaseMac').rglob('*.swift'),
        platform='macos', package_products=mac_libs, dependencies=['CalendarDemoSupportMac'], frameworks=['CalendarDemoSupportMac'])
-mac_test_paths = list((ROOT / 'Example/CalendarShowcaseMacTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarAppKitTests').rglob('*.swift'))
+mac_test_paths = contract_paths + list((ROOT / 'Example/CalendarShowcaseMacTests').rglob('*.swift')) + list((ROOT / 'Tests/FSCalendarAppKitTests').rglob('*.swift'))
 target('CalendarShowcaseMacTests', 'com.apple.product-type.bundle.unit-test', mac_test_paths,
        dependencies=['CalendarShowcaseMac'], platform='macos', package_products=mac_libs, frameworks=['CalendarDemoSupportMac'],
        extra={'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/CalendarShowcaseMac.app/Contents/MacOS/CalendarShowcaseMac', 'BUNDLE_LOADER': '$(TEST_HOST)'})
