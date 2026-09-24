@@ -43,6 +43,7 @@ import FSCalendarCore
     let collectionView = CalendarCollectionView()
     let scrollView = CalendarScrollView()
     let titleLabel = NSTextField(labelWithString: "")
+    private var shortMonthSymbols: [String] = []
     let weekdayLabels = (0..<7).map { _ in NSTextField(labelWithString: "") }
     let controller = CalendarCollectionController()
     var needsPagePosition = true
@@ -204,6 +205,9 @@ import FSCalendarCore
     }
     func configure(_ item: FSCalendarItem, occurrence: DayOccurrence) {
         var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
+        if renderingMode.isContinuous, occurrence.day.day == 1, content.title == nil {
+            content.title = shortMonthSymbols[occurrence.day.month - 1]
+        }
         if content.accessibilityLabel == nil {
             content.accessibilityLabel = (try? occurrence.day.date(in: configuration.timeZone)).map { formatter("EEEE, MMMM d, yyyy").string(from: $0) }
         }
@@ -224,9 +228,11 @@ import FSCalendarCore
         if !continuous && configuration.placeholders == .sixRows { return 6 }
         return ((day.startOfMonth.weekday - configuration.firstWeekday + 7) % 7 + day.daysInMonth + 6) / 7
     }
-    func height(for day: CivilDay, mode: CalendarDisplayMode) -> CGFloat { metrics.headerHeight + metrics.weekdayHeight + CGFloat(rowCount(day, scope: mode.scope, continuous: mode.isContinuous)) * metrics.rowHeight }
+    func height(for day: CivilDay, mode: CalendarDisplayMode) -> CGFloat { (mode.isContinuous ? 0 : metrics.headerHeight) + metrics.weekdayHeight + CGFloat(rowCount(day, scope: mode.scope, continuous: mode.isContinuous)) * metrics.rowHeight }
     func rebuild() {
         input.cancelScroll()
+        shortMonthSymbols = formatter("LLL").shortStandaloneMonthSymbols
+        calendarLayout.monthSeparatorColor = metrics.monthSeparatorColor
         calendarLayout.mode = renderingMode; calendarLayout.rowHeight = metrics.rowHeight
         calendarLayout.continuousSections = renderingMode.isContinuous ? engine.continuousMonthSections() : []
         calendarLayout.rows = (0..<engine.pageCount(scope: renderingMode.scope)).compactMap { try? engine.page(at: $0, scope: renderingMode.scope) }.map { rowCount($0.anchor, scope: renderingMode.scope, continuous: renderingMode.isContinuous) }
@@ -272,7 +278,8 @@ import FSCalendarCore
         if transition != nil, lastSize != .zero,
            abs(bounds.width - lastSize.width) > 0.5 || (abs(bounds.height - lastSize.height) > 0.5 && abs(bounds.height - preferredHeight) > 1) { cancelTransition() }
         let appearance = metrics
-        let headerHeight = appearance.headerHeight
+        let headerHeight = renderingMode.isContinuous ? 0 : appearance.headerHeight
+        titleLabel.isHidden = renderingMode.isContinuous
         titleLabel.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         for (index, label) in weekdayLabels.enumerated() {
             label.frame = NSRect(x: CGFloat(index) * bounds.width / 7, y: headerHeight, width: bounds.width / 7, height: appearance.weekdayHeight)

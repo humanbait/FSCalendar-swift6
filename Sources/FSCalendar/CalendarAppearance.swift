@@ -17,6 +17,8 @@ public typealias DayState = FSCalendarCore.DayState
     public var subtitleColor: UIColor = .secondaryLabel
     public var eventColor: UIColor = .systemIndigo
     public var headerColor: UIColor = .label
+    /// Month boundaries in continuous mode.
+    public var monthSeparatorColor: UIColor = .separator
     public var backgroundColor: UIColor = .secondarySystemGroupedBackground
     public var titleFont: UIFont = .preferredFont(forTextStyle: .body)
     public var subtitleFont: UIFont = .preferredFont(forTextStyle: .caption2)

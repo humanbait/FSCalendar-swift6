@@ -31,7 +31,126 @@ import FSCalendarCore
 
 extension FSCalendar: RendererSelectionContract {}
 
+@MainActor private final class MonthLabelProvider: FSCalendarDataSource {
+    var content = DayContent()
+    func calendar(_ calendar: FSCalendar, contentFor day: CivilDay) -> DayContent { content }
+}
+
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testMonthSeparatorGeometryMirroringAndDecorationLifecycle() throws {
+        for weekday in 1...7 {
+            let engine = try CalendarEngine(configuration: CalendarConfiguration(firstWeekday: weekday,
+                minimumDate: CivilDay(year: 2023, month: 12, day: 15),
+                maximumDate: CivilDay(year: 2024, month: 3, day: 20)))
+            for width: CGFloat in [350.3, 490.7] {
+                let layout = CalendarCollectionLayout()
+                layout.mode = .continuousMonths; layout.rowHeight = 45.4121
+                layout.continuousSections = engine.continuousMonthSections()
+                layout.rows = layout.continuousSections.map(\.rowCount)
+                let collection = UICollectionView(frame: CGRect(x: 0, y: 0, width: width, height: 400), collectionViewLayout: layout)
+                let scale = max(1, collection.traitCollection.displayScale)
+                let kind = MonthSeparatorView.kind
+                func separator(_ section: Int) throws -> MonthSeparatorAttributes {
+                    try XCTUnwrap(layout.layoutAttributesForDecorationView(ofKind: kind,
+                        at: IndexPath(item: 0, section: section)) as? MonthSeparatorAttributes)
+                }
+                XCTAssertNil(layout.layoutAttributesForDecorationView(ofKind: kind, at: IndexPath(item: 0, section: 0)))
+                XCTAssertNil(layout.layoutAttributesForDecorationView(ofKind: kind, at: IndexPath(item: 0, section: 4)))
+                for section in 1..<layout.continuousSections.count {
+                    layout.isRTL = false
+                    let a = try separator(section)
+                    let column = layout.continuousSections[section].startSlot % 7
+                    XCTAssertEqual(a.segments.count, column == 0 ? 1 : 3)
+                    XCTAssertGreaterThan(a.zIndex, 0)
+                    let first = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 0, section: section)))
+                    XCTAssertEqual(a.frame.minY, first.frame.minY, accuracy: 0.5 / scale)
+                    XCTAssertEqual(a.segments.last?.maxX, a.frame.width)
+                    XCTAssertEqual(a.segments.last?.minY, 0)
+                    if column != 0 {
+                        XCTAssertEqual(a.segments[1].minX, first.frame.minX, accuracy: 0.5 / scale)
+                        XCTAssertEqual(a.frame.minY + a.segments[0].minY, first.frame.maxY, accuracy: 0.5 / scale)
+                    }
+                    for segment in a.segments {
+                        XCTAssertEqual(min(segment.width, segment.height), 1 / scale, accuracy: 0.00001)
+                        let global = segment.offsetBy(dx: a.frame.minX, dy: a.frame.minY)
+                        for value in [global.minX, global.minY, global.width, global.height] {
+                            XCTAssertEqual(value * scale, (value * scale).rounded(), accuracy: 0.00001)
+                        }
+                        let visible = (layout.layoutAttributesForElements(in: global) ?? [])
+                        XCTAssertTrue(visible.contains { $0.representedElementKind == kind && $0.indexPath.section == section })
+                    }
+                    let copy = try XCTUnwrap(a.copy() as? MonthSeparatorAttributes)
+                    XCTAssertTrue(a.isEqual(copy))
+                    copy.color = .red
+                    XCTAssertFalse(a.isEqual(copy))
+                    layout.isRTL = true
+                    let mirrored = try separator(section)
+                    for (left, right) in zip(a.segments, mirrored.segments) {
+                        XCTAssertEqual(left.minX, a.frame.width - right.maxX, accuracy: 0.00001)
+                        XCTAssertEqual(left.minY, right.minY)
+                    }
+                    layout.monthSeparatorColor = .red
+                    XCTAssertEqual(try separator(section).color, .red)
+                    layout.monthSeparatorColor = .separator
+                }
+                let all = (layout.layoutAttributesForElements(in: CGRect(origin: .zero, size: layout.collectionViewContentSize)) ?? [])
+                XCTAssertEqual(all.filter { $0.representedElementKind == kind }.count, 3)
+                let decoration = MonthSeparatorView(frame: .zero)
+                decoration.apply(try separator(1))
+                XCTAssertFalse(decoration.isUserInteractionEnabled)
+                XCTAssertFalse(decoration.isAccessibilityElement)
+                layout.mode = .week
+                XCTAssertNil(layout.layoutAttributesForDecorationView(ofKind: kind, at: IndexPath(item: 0, section: 1)))
+            }
+        }
+    }
+    @MainActor func testContinuousMonthLabelsLocaleCustomTitlesAndReuse() throws {
+
+        let view = FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 400))
+        let provider = MonthLabelProvider(); view.dataSource = provider
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let cell = FSCalendarCell(frame: .zero)
+        for locale in ["en_US_POSIX", "de_DE", "ru_RU", "zh_CN"] {
+            try view.apply(configuration: CalendarConfiguration(
+                minimumDate: CivilDay(year: 2023, month: 12, day: 1),
+                maximumDate: CivilDay(year: 2024, month: 3, day: 31),
+                timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: locale)))
+            let formatter = DateFormatter(); formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = view.configuration.locale
+            for month in [1, 3] {
+                let day = try CivilDay(year: 2024, month: month, day: 1)
+                let occurrences = try view.engine.continuousMonthGrid(containing: day).occurrences
+                provider.content = DayContent()
+                view.configure(cell, occurrence: occurrences[0])
+                XCTAssertEqual(cell.titleLabel.text, formatter.shortStandaloneMonthSymbols[month - 1])
+                let accessibility = cell.accessibilityLabel
+                if locale == "en_US_POSIX" {
+                    XCTAssertEqual(cell.titleLabel.text, month == 1 ? "Jan" : "Mar")
+                    XCTAssertTrue(accessibility?.contains(month == 1 ? "January 1, 2024" : "March 1, 2024") == true)
+                }
+                for customTitle in ["Launch", ""] {
+                    provider.content = DayContent(title: customTitle, subtitle: "Note", image: UIImage(systemName: "heart"))
+                    view.configure(cell, occurrence: occurrences[0])
+                    XCTAssertEqual(cell.titleLabel.text, customTitle)
+                    XCTAssertEqual(cell.subtitleLabel.text, "Note")
+                    XCTAssertNotNil(cell.dayImageView.image)
+                    XCTAssertEqual(cell.accessibilityLabel, accessibility)
+                }
+                provider.content = DayContent(accessibilityLabel: "Custom date")
+                view.configure(cell, occurrence: occurrences[0])
+                XCTAssertEqual(cell.accessibilityLabel, "Custom date")
+                cell.prepareForReuse(); provider.content = DayContent()
+                view.configure(cell, occurrence: occurrences[1])
+                XCTAssertEqual(cell.titleLabel.text, "2")
+                XCTAssertNil(cell.dayImageView.image)
+                try view.setDisplayMode(.week, animated: false)
+                view.configure(cell, occurrence: occurrences[0])
+                XCTAssertEqual(cell.titleLabel.text, "1")
+                try view.setDisplayMode(.continuousMonths, animated: false)
+            }
+        }
+    }
+
     @MainActor private func hostForAnimation(_ calendar: FSCalendar) -> (UIWindow, CalendarSpy) {
         let window: UIWindow
         if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
@@ -76,6 +195,7 @@ final class CalendarViewTests: XCTestCase {
 
     @MainActor func testContinuousBoundarySelectionReloadHeadingAndScopeRoundTrip() throws {
         let view = FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 400))
+        let provider = MonthLabelProvider(); view.dataSource = provider
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let controller = UIViewController(); window.rootViewController = controller
         controller.view.addSubview(view); window.makeKeyAndVisible()
@@ -91,12 +211,13 @@ final class CalendarViewTests: XCTestCase {
             try view.setCurrentPage(march, animated: false)
             view.layoutIfNeeded(); view.collectionView.layoutIfNeeded()
             XCTAssertEqual(view.currentPage, march)
-            XCTAssertEqual(view.titleLabel.text, "March 2024")
+            XCTAssertTrue(view.titleLabel.isHidden)
             XCTAssertEqual(view.calendarLayout.itemCount(in: 0), 29)
             XCTAssertEqual(view.calendarLayout.itemCount(in: 1), 31)
             XCTAssertFalse(try XCTUnwrap(view.grid(in: 0)).occurrences[8].isSelectable)
             let headingFrame = view.titleLabel.frame
-            XCTAssertGreaterThan(headingFrame.height, 0)
+            XCTAssertEqual(headingFrame.height, 0)
+            XCTAssertEqual(view.weekdayStack.frame.minY, 0)
             let cells = view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }
             let days = cells.compactMap { $0.dayState?.occurrence.day }
             XCTAssertEqual(Set(days).count, days.count)
@@ -110,17 +231,27 @@ final class CalendarViewTests: XCTestCase {
             XCTAssertEqual(first.dayState?.isSelected, true)
             view.today = leapDay; view.reload(dates: [leapDay, march])
             XCTAssertEqual(last.dayState?.isToday, true)
+            XCTAssertEqual(first.titleLabel.text, "Mar")
+            provider.content = DayContent(title: "Launch")
+            view.reload(dates: [march])
+            XCTAssertEqual(first.titleLabel.text, "Launch")
+            provider.content = DayContent(); view.reload(dates: [march])
+            XCTAssertEqual(first.titleLabel.text, "Mar")
+            XCTAssertTrue(first.accessibilityLabel?.contains("March 1, 2024") == true)
 
             var point = view.calendarLayout.offset(for: 1)
             point.y -= view.calendarLayout.rowHeight
             view.collectionView.setContentOffset(point, animated: false)
             XCTAssertEqual(view.currentPage, leapDay.startOfMonth)
-            XCTAssertEqual(view.titleLabel.text, "February 2024")
+            XCTAssertTrue(view.titleLabel.isHidden)
             point = view.calendarLayout.offset(for: 1)
             view.collectionView.setContentOffset(point, animated: false)
             XCTAssertEqual(view.currentPage, march)
             XCTAssertEqual(view.titleLabel.frame, headingFrame)
             try view.setDisplayMode(.week, animated: false)
+            view.layoutIfNeeded()
+            XCTAssertFalse(view.titleLabel.isHidden)
+            XCTAssertGreaterThan(view.titleLabel.frame.height, 0)
             try view.setDisplayMode(.continuousMonths, animated: false)
             view.layoutIfNeeded(); view.collectionView.layoutIfNeeded()
             XCTAssertEqual(view.selectedDays, [leapDay, march])
@@ -168,7 +299,7 @@ final class CalendarViewTests: XCTestCase {
                     }
                     if section > 0, month.startSlot % 7 != 0 {
                         let rect = CGRect(x: 0, y: offset.y + 1, width: 350, height: layout.rowHeight - 2)
-                        let attributes = layout.layoutAttributesForElements(in: rect) ?? []
+                        let attributes = (layout.layoutAttributesForElements(in: rect) ?? []).filter { $0.representedElementCategory == .cell }
                         XCTAssertEqual(attributes.count, 7)
                         XCTAssertEqual(Set(attributes.map(\.indexPath.section)), [section - 1, section])
                     }

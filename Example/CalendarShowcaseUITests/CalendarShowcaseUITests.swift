@@ -167,6 +167,7 @@ final class CalendarShowcaseUITests: XCTestCase {
         day(app, "2024-02-29").tap()
         day(app, "2024-03-01").tap()
         wait(state, contains: "2024-03-01")
+        XCTAssertFalse(app.staticTexts["calendar.heading"].exists)
         let february = day(app, "2024-02-29"), march = day(app, "2024-03-01")
         XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)
         XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 1)

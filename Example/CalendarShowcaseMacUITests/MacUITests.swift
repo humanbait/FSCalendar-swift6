@@ -98,6 +98,8 @@ final class MacUITests: XCTestCase {
         click("2024-02-19")
         XCTAssertEqual(readout.value as? String, beforeInsideTap)
         click("2024-02-29"); click("2024-03-01"); waitFor("2024-03-01")
+        XCTAssertFalse(app.staticTexts["calendar.heading"].exists)
+        XCTAssertFalse(app.textFields["calendar.heading"].exists)
         let february = app.buttons["day.2024-02-29.1.2024-02-01"]
         let march = app.buttons["day.2024-03-01.1.2024-03-01"]
         XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)

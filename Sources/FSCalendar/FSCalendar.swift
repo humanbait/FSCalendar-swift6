@@ -182,7 +182,8 @@ import FSCalendarCore
         let needsRepositionForSize = bounds.width != lastBoundsSize.width ||
             (bounds.height != lastBoundsSize.height && !renderingMode.isHorizontal)
         lastBoundsSize = bounds.size
-        let headerHeight = effectiveHeaderHeight
+        let headerHeight = renderingMode.isContinuous ? 0 : effectiveHeaderHeight
+        titleLabel.isHidden = renderingMode.isContinuous
         titleLabel.frame = CGRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         weekdayStack.frame = CGRect(x: 0, y: headerHeight, width: bounds.width, height: effectiveWeekdayHeight)
         let top = headerHeight + effectiveWeekdayHeight
@@ -205,6 +206,7 @@ import FSCalendarCore
     }
     public override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
+        if traitCollection.displayScale != previousTraitCollection?.displayScale { calendarLayout.invalidateLayout() }
         if traitCollection.preferredContentSizeCategory != previousTraitCollection?.preferredContentSizeCategory {
             cancelTransition(); refreshAppearance()
         } else if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
@@ -224,7 +226,7 @@ import FSCalendarCore
         return (leading + month.daysInMonth + 6) / 7
     }
     func height(for mode: CalendarDisplayMode, page: CivilDay) -> CGFloat {
-        effectiveHeaderHeight + effectiveWeekdayHeight + CGFloat(rowCount(for: page, scope: mode.scope, continuous: mode.isContinuous)) * effectiveRowHeight
+        (mode.isContinuous ? 0 : effectiveHeaderHeight) + effectiveWeekdayHeight + CGFloat(rowCount(for: page, scope: mode.scope, continuous: mode.isContinuous)) * effectiveRowHeight
     }
     func clamped(_ day: CivilDay) -> CivilDay { min(configuration.maximumDate, max(configuration.minimumDate, day)) }
     func refreshAppearance() {
@@ -254,6 +256,7 @@ import FSCalendarCore
         renderingMode = mode
         calendarLayout.mode = mode
         calendarLayout.rowHeight = effectiveRowHeight
+        calendarLayout.monthSeparatorColor = appearance.monthSeparatorColor
         calendarLayout.continuousSections = mode.isContinuous ? engine.continuousMonthSections() : []
         calendarLayout.rows = (0..<engine.pageCount(scope: mode.scope)).map { index in
             guard let id = try? engine.page(at: index, scope: mode.scope) else { return 0 }
@@ -288,7 +291,10 @@ import FSCalendarCore
         return grid
     }
     func configure(_ cell: FSCalendarCell, occurrence: DayOccurrence) {
-        let content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
+        var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
+        if renderingMode.isContinuous, occurrence.day.day == 1, content.title == nil {
+            content.title = monthFormatter.shortStandaloneMonthSymbols[occurrence.day.month - 1]
+        }
         let style = dataSource?.calendar(self, appearanceFor: occurrence.day) ?? DayAppearance()
         cell.apply(content: content, state: DayState(occurrence: occurrence, isSelected: selection.contains(occurrence.day), isToday: today == occurrence.day),
                    appearance: resolvedAppearance, style: style)

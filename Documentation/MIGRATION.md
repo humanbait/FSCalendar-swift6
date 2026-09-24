@@ -80,7 +80,7 @@ Transitions anchor to the latest selected visible day, then visible today, then 
 
 Cancellation restores source mode/page/height. Replacement cancels and restarts toward the latest target. External resizing/configuration changes cancel before relayout. Reduce Motion suppresses settling animation. In constrained containers update the height constraint inside `preferredHeightDidChange`; interactive callbacks supply intermediate heights.
 
-Continuous mode shares week rows across months, shows each date once, ignores placeholder settings, and keeps a fixed month heading above the weekdays. It requires a viewport height; it has no intrinsic height for the complete date range. Detailed grids use a nine-page LRU cache. Lightweight section geometry covers the range; item attributes are computed around the visible rectangle.
+Continuous mode shares week rows across months, shows each date once, ignores placeholder settings, and omits the month/year heading. First days use localized short month names unless a custom title is supplied. Stepped separators mark month boundaries; customize their color with `appearance.monthSeparatorColor`. Weekday labels remain visible. It requires a viewport height; it has no intrinsic height for the complete date range. Detailed grids use a nine-page LRU cache. Lightweight section geometry covers the range; item attributes are computed around the visible rectangle.
 
 ## Compatibility
 

@@ -18,7 +18,7 @@ The runner stops only its own process after 180 seconds without output or 30 min
 
 - Core: leap years, seven first weekdays, month/week boundaries, row counts, DST, skipped civil days, inclusive bounds, date/index/page round trips, invalid/overflow inputs.
 - Selection: order, deduplication, atomic replacement, validation, no-op proposals, configuration pruning.
-- UIKit contracts: callbacks, veto/reentry, placeholder synchronization, cancellation/replacement/resize, intrinsic height, Dynamic Type, finite geometry, fixed continuous heading/shared boundary weeks/RTL, fractional-height continuous navigation, bounded cache over 120 months.
+- UIKit contracts: callbacks, veto/reentry, placeholder synchronization, cancellation/replacement/resize, intrinsic height, Dynamic Type, finite geometry, continuous heading removal/restoration, localized month labels, stepped separators/shared boundary weeks/RTL, fractional-height continuous navigation, bounded cache over 120 months.
 - Demo: all 19 Swift scenarios, selection/reload persistence, custom title/subtitle/image/events after reuse.
 - UI: tap/reset, paging persistence, repeated scope changes/rotation, custom range cells, a dedicated combined-usage connected range with continuous month scrolling and button-only scope changes, swipe selection, continuous scrolling, vertical paging, interactive scope round trip, bounds, five appearance screens, launch measurements, week navigation, dynamic row height, and an iOS 17 accessibility-description audit.
 
@@ -90,3 +90,37 @@ Library and Mac test sources were unchanged after the full Mac pass. Subsequent 
 only stabilized UIKit animation checks, extended UIKit cache coverage, and recorded this
 evidence. Exact Swift 6.2, iOS 16, macOS 13, and manual VoiceOver validation remain separate
 gates; these runs do not establish those configurations.
+
+## Month separators and short labels — 2026-09-24
+
+Validated on the same Xcode 27.1 / Swift 6.4 toolchain, macOS 27.0 arm64, and
+physical iPhone 11 with iOS 17.7.2. Continuous mode now hides the heading and its
+height, uses localized short month names on first days, and draws stepped rules.
+
+| Check | Result | Local evidence under `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 40 passed | `month-separators-final-20260924T060312Z/package.log` |
+| Full `test-macos.sh --destination 'platform=macOS,arch=arm64'` | 35 hosted/UI tests passed | `month-separators-final-20260924T060312Z/` |
+| Physical iPhone hosted suite and `testConnectedRangeCombinedUsage` | 63 passed | `month-separators-final-20260924T060309645114Z/` |
+
+Regression coverage includes all seven first weekdays, mixed and aligned boundaries,
+December–January and leap-day boundaries, RTL, fractional dimensions, pixel alignment,
+visible decoration queries, decoration copying/color changes, and noninteractive rules.
+Date-cell assertions exclude decoration attributes. Label tests cover English, German,
+Russian, and Chinese; custom titles (including empty titles), subtitles/images, reuse,
+targeted reloads, and unchanged full-date accessibility. Heading removal/restoration,
+selection, resizing, navigation, bounded caches, keyboard focus, and continuous/week
+round trips also pass.
+
+Exported `swift-month-separators-light/dark` and `appkit-month-separators-light/dark`
+attachments were inspected for short month labels and separator geometry/color. The
+connected-range UI captures and hosted geometry assertions verify the band across
+February 29–March 1; AppKit's bitmap view captures do not reproduce selective layer
+corner masks, so the live UI capture is the visual reference for its connected band.
+Screenshots, logs, result bundles, and manifests remain in ignored `artifacts/`.
+
+The first macOS Xcode run reused stale generated Core module data and failed to find
+an existing continuous-grid API. Cleaning `artifacts/MacDerivedData` with `xcodebuild clean`
+resolved it; the full rerun passed without changing the Core model. The generated project
+diff adds the UIKit decoration source; AppKit discovers its source through SwiftPM.
+Exact Swift 6.2, iOS 16, macOS 13, and manual VoiceOver remain untested release gates.

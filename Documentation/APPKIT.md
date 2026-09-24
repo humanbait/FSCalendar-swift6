@@ -78,7 +78,11 @@ activates the focused day. Page Up/Down navigate pages. Tab and Shift-Tab leave 
 normally. Set `userInterfaceLayoutDirection = .rightToLeft` for explicit RTL.
 
 Paged trackpad input accumulates and snaps once scrolling settles. Continuous months use
-native NSScrollView scrolling, shared boundary weeks with no repeated dates, and a fixed month heading above the weekdays. Heavy day grids use an LRU cache
+native NSScrollView scrolling and shared boundary weeks with no repeated dates. Weekday
+labels remain visible; the month/year heading is hidden without reserving its height.
+First days use localized short month names, and stepped lines separate months. Set
+`calendarAppearance.monthSeparatorColor` to customize the rules; explicit `DayContent.title`
+values override month names. Heavy day grids use an LRU cache
 capped at nine pages; section frames/row counts stay lightweight. Day accessibility IDs
 contain the civil date, month position and page anchor, so placeholders are distinguishable.
 

@@ -162,7 +162,26 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertEqual(february.selectionBackground.layer.maskedCorners, left)
         XCTAssertEqual(march.selectionBackground.layer.maskedCorners, right)
         XCTAssertEqual(boundaryCells.filter { $0.dayState?.occurrence.day == boundary[0] }.count, 1)
+        XCTAssertEqual(march.titleLabel.text, "Mar")
         try driver.calendar.setCurrentPage(days[0], animated: false)
+        for (name, style) in [("light", UIUserInterfaceStyle.light), ("dark", .dark)] {
+            window.overrideUserInterfaceStyle = style
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                MainActor.assumeIsolated {
+                    driver.view.layoutIfNeeded()
+                    return driver.view.traitCollection.userInterfaceStyle == style &&
+                        cells(in: driver.view).contains { $0.dayState?.occurrence.day == boundary[1] }
+                }
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 3), .completed)
+            let image = UIGraphicsImageRenderer(bounds: driver.view.bounds).image { _ in
+                XCTAssertTrue(driver.view.drawHierarchy(in: driver.view.bounds, afterScreenUpdates: true))
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "swift-month-separators-\(name)"; attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        window.overrideUserInterfaceStyle = .unspecified
 
         try driver.calendar.setSelection([days[4]])
         driver.calendar.reloadData(); driver.view.layoutIfNeeded()

@@ -28,10 +28,26 @@ Placeholder settings, including six-row padding, apply only to paged month prese
 The first and last months remain complete: dates outside selection bounds are disabled,
 and unused weekday slots at the outer edges are blank.
 
-A fixed month/year heading sits above the weekdays. `currentPage` and the heading identify
-the latest month whose first week has reached the viewport top, including a partially
-visible boundary week. `setCurrentPage` and month navigation align that first week at the
-top. Trailing scroll space lets the final month reach the same alignment in tall viewports.
+Continuous mode has no month/year heading or reserved heading space. The weekday labels
+stay above the grid. Each month's first day shows its localized short standalone month
+name (for example, `Jan` or `Feb`) instead of `1`, using the normal title styling.
+A non-nil `DayContent.title`, including an empty string, takes precedence. Subtitles,
+images, and full-date accessibility labels retain their usual behavior. Changing the
+configuration locale refreshes the month names.
+
+A one-physical-pixel separator follows each internal month boundary: below the previous
+month's cells, beside the first new-month cell, and above the remaining cells in the row.
+Months starting in the first weekday column get a straight line above that row. No rule
+is drawn before the first displayed month or after the last. Layout decorations draw
+above selection backgrounds without intercepting input or exposing accessibility elements,
+including for custom cells. `FSCalendarAppearance.monthSeparatorColor` defaults to the
+platform's semantic separator color. Geometry mirrors in RTL and follows resizing and
+display scale; colors follow appearance changes.
+
+`currentPage` identifies the latest month whose first week has reached the viewport top,
+including a partially visible boundary week. `setCurrentPage` and month navigation align
+that first week at the top. Trailing scroll space lets the final month reach the same alignment in tall viewports.
+Paged month and week modes restore the heading and numeric first-day titles.
 RTL mirrors weekday columns without changing chronological row order. A viewport height
 is still required; continuous mode has no intrinsic height for the entire range.
 

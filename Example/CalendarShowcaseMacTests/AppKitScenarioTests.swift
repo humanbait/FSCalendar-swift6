@@ -85,7 +85,19 @@ final class AppKitScenarioTests: XCTestCase {
         XCTAssertEqual(february.selectionBackground.layer?.maskedCorners, left)
         XCTAssertEqual(march.selectionBackground.layer?.maskedCorners, right)
         XCTAssertEqual(boundaryCells.filter { $0.dayState?.occurrence.day == boundary[0] }.count, 1)
+        XCTAssertEqual(march.titleLabel.stringValue, "Mar")
         try driver.calendar.setCurrentPage(days[0], animated: false)
+        for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+            window.appearance = NSAppearance(named: appearance)
+            driver.view.layoutSubtreeIfNeeded(); driver.view.displayIfNeeded()
+            let bitmap = try XCTUnwrap(driver.view.bitmapImageRepForCachingDisplay(in: driver.view.bounds))
+            driver.view.cacheDisplay(in: driver.view.bounds, to: bitmap)
+            let image = NSImage(size: driver.view.bounds.size); image.addRepresentation(bitmap)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "appkit-month-separators-\(name)"; attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        window.appearance = nil
 
         try driver.calendar.setSelection([days[4]])
         driver.calendar.reloadData(); driver.view.layoutSubtreeIfNeeded()
