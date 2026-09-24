@@ -73,6 +73,20 @@ final class AppKitScenarioTests: XCTestCase {
         XCTAssertGreaterThan(friday.selectionBackground.frame.maxX, friday.view.bounds.maxX)
         XCTAssertLessThan(saturday.selectionBackground.frame.minX, saturday.view.bounds.minX)
 
+        let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+        try driver.calendar.setSelection(boundary)
+        try driver.calendar.setCurrentPage(boundary[1], animated: false)
+        driver.calendar.reloadData(); driver.view.layoutSubtreeIfNeeded()
+        let boundaryCells = collection.visibleItems().compactMap { $0 as? ConnectedRangeAppKitItem }
+        let february = try XCTUnwrap(boundaryCells.first { $0.dayState?.occurrence.day == boundary[0] })
+        let march = try XCTUnwrap(boundaryCells.first { $0.dayState?.occurrence.day == boundary[1] })
+        XCTAssertEqual(february.view.frame.minY, march.view.frame.minY, accuracy: 0.5)
+        XCTAssertEqual(february.view.frame.maxX, march.view.frame.minX, accuracy: 0.5)
+        XCTAssertEqual(february.selectionBackground.layer?.maskedCorners, left)
+        XCTAssertEqual(march.selectionBackground.layer?.maskedCorners, right)
+        XCTAssertEqual(boundaryCells.filter { $0.dayState?.occurrence.day == boundary[0] }.count, 1)
+        try driver.calendar.setCurrentPage(days[0], animated: false)
+
         try driver.calendar.setSelection([days[4]])
         driver.calendar.reloadData(); driver.view.layoutSubtreeIfNeeded()
         let single = try band(20)

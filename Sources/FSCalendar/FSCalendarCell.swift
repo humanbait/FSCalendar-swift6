@@ -112,14 +112,4 @@ import FSCalendarCore
     }
 }
 
-@MainActor final class CalendarMonthHeader: UICollectionReusableView {
-    let label = UILabel()
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        label.textAlignment = .center; label.adjustsFontForContentSizeCategory = true
-        label.accessibilityTraits = .header; addSubview(label)
-    }
-    required init?(coder: NSCoder) { super.init(coder: coder); addSubview(label) }
-    override func layoutSubviews() { super.layoutSubviews(); label.frame = bounds.insetBy(dx: 8, dy: 2) }
-}
 #endif

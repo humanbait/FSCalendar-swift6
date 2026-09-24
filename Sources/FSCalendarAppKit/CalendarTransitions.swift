@@ -57,7 +57,9 @@ extension FSCalendarView {
         let changesScope = mode.scope != target.scope && !mode.isContinuous && !target.isContinuous
         let renderMode: CalendarDisplayMode = changesScope ? (mode.scope == .month ? mode : target) : target
         let renderPage = engine.pageID(containing: plan.anchor, scope: renderMode.scope).anchor
-        let grid = try? engine.grid(containing: renderPage, scope: renderMode.scope)
+        let grid = try? renderMode.isContinuous
+            ? engine.continuousMonthGrid(containing: renderPage)
+            : engine.grid(containing: renderPage, scope: renderMode.scope)
         let row = grid.flatMap { engine.index(of: plan.anchor, in: $0) }.map { $0 / 7 } ?? 0
         let context = CalendarTransition(sourceMode: mode, sourcePage: page, plan: plan,
             sourceHeight: height(for: page, mode: mode), targetHeight: height(for: plan.destinationPage, mode: target),

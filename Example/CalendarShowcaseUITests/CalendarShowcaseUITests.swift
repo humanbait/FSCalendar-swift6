@@ -164,12 +164,20 @@ final class CalendarShowcaseUITests: XCTestCase {
         let beforeInsideTap = state.label
         day(app, "2024-02-19").tap()
         XCTAssertEqual(state.label, beforeInsideTap)
+        day(app, "2024-02-29").tap()
+        day(app, "2024-03-01").tap()
+        wait(state, contains: "2024-03-01")
+        let february = day(app, "2024-02-29"), march = day(app, "2024-03-01")
+        XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)
+        XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 1)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "\(implementation)-connected-range-continuous"
         shot.lifetime = .keepAlways
         add(shot)
+        let beforeScroll = page.label
         app.collectionViews["calendar-grid"].swipeUp()
-        wait(page, contains: "2024-03")
+        let scrolled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", beforeScroll), object: page)
+        XCTAssertEqual(XCTWaiter.wait(for: [scrolled], timeout: 5), .completed)
         XCTAssertTrue(page.label.contains("month"))
         XCTAssertTrue(state.label.contains("2024-02-21"))
         app.buttons["scope"].tap()

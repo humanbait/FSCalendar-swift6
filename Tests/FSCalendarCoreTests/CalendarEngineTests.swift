@@ -106,6 +106,62 @@ final class CalendarEngineTests: XCTestCase {
             }
         }
     }
+    func testContinuousMonthsOwnEveryDayOnceForAllWeekdaysAndPlaceholderModes() throws {
+        let minimum = try day(2023, 12, 15), maximum = try day(2025, 3, 20)
+        for weekday in 1...7 {
+            var expectedGrids: [CalendarGrid]?
+            var expectedSections: [ContinuousMonthSection]?
+            for placeholders: PlaceholderMode in [.none, .variable, .sixRows] {
+                let e = try CalendarEngine(configuration: CalendarConfiguration(firstWeekday: weekday,
+                    placeholders: placeholders, minimumDate: minimum, maximumDate: maximum,
+                    timeZone: TimeZone(secondsFromGMT: 0)!))
+                let sections = e.continuousMonthSections()
+                let grids = try sections.map { try e.continuousMonthGrid(containing: $0.page.anchor) }
+                if let expectedGrids { XCTAssertEqual(grids, expectedGrids) }
+                if let expectedSections { XCTAssertEqual(sections, expectedSections) }
+                expectedGrids = grids; expectedSections = sections
+                let days = grids.flatMap { $0.occurrences.map(\.day) }
+                XCTAssertEqual(Set(days).count, days.count)
+                XCTAssertEqual(days.first, minimum.startOfMonth)
+                XCTAssertEqual(days.last, try day(2025, 3, 31))
+                for (a, b) in zip(days, days.dropFirst()) { XCTAssertEqual(a.distance(to: b), 1) }
+                for (section, grid) in zip(sections, grids) {
+                    XCTAssertEqual(grid.occurrences.count, section.dayCount)
+                    XCTAssertEqual(grid.rowCount, section.rowCount)
+                    XCTAssertEqual(section.dayCount, section.page.anchor.daysInMonth)
+                    for (index, occurrence) in grid.occurrences.enumerated() {
+                        XCTAssertEqual(occurrence.position, .current)
+                        XCTAssertFalse(occurrence.isHidden)
+                        XCTAssertEqual(occurrence.id.page.anchor, occurrence.day.startOfMonth)
+                        XCTAssertEqual(e.index(of: occurrence.day, in: grid), index)
+                        XCTAssertEqual((section.startSlot + index) % 7, (occurrence.day.weekday - weekday + 7) % 7)
+                        XCTAssertEqual(occurrence.isSelectable, occurrence.day >= minimum && occurrence.day <= maximum)
+                    }
+                }
+                for (a, b) in zip(sections, sections.dropFirst()) {
+                    XCTAssertEqual(a.startSlot + a.dayCount, b.startSlot)
+                }
+                XCTAssertEqual(grids.first { $0.id.anchor == (try? day(2024, 2, 1)) }?.occurrences.count, 29)
+            }
+        }
+    }
+    func testContinuousMonthsPreserveSkippedCivilDaySlotsAndBounds() throws {
+        let skipped = try day(2011, 12, 30)
+        let e = try CalendarEngine(configuration: CalendarConfiguration(minimumDate: day(2011, 12, 29),
+            maximumDate: day(2011, 12, 31), timeZone: TimeZone(identifier: "Pacific/Apia")!))
+        let grid = try e.continuousMonthGrid(containing: skipped)
+        XCTAssertEqual(grid.occurrences.count, 31)
+        XCTAssertFalse(grid.occurrences[29].isSelectable)
+        XCTAssertFalse(grid.occurrences[29].isHidden)
+        XCTAssertEqual(grid.occurrences.filter(\.isSelectable).map(\.day), [try day(2011, 12, 29), try day(2011, 12, 31)])
+        for year in [1, 9999] {
+            let boundary = try day(year, year == 1 ? 1 : 12, 1)
+            let bounded = try CalendarEngine(configuration: CalendarConfiguration(minimumDate: boundary,
+                maximumDate: boundary, timeZone: TimeZone(secondsFromGMT: 0)!))
+            XCTAssertEqual(bounded.continuousMonthSections().count, 1)
+            XCTAssertEqual(try bounded.continuousMonthGrid(containing: boundary).occurrences.count, 31)
+        }
+    }
     func testInvalidConfigurationIsRejected() throws {
         XCTAssertThrowsError(try CalendarConfiguration(firstWeekday: 0))
         XCTAssertThrowsError(try CalendarConfiguration(firstWeekday: 8))

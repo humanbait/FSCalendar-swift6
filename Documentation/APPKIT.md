@@ -71,14 +71,14 @@ Single-selection clicks replace the selection. Multiple-selection clicks toggle 
 day; Command and Shift do not change this policy. Disabled selection prevents activation.
 Dragging paints additions or removals according to the first date and visits each date
 at most once per gesture. Focus is independent: `focusedDay` is read-only and
-`try focus(day)` validates the day, brings its page into view and leaves selection alone.
+`try focus(day)` validates the day, brings it into view and leaves selection alone. In continuous mode an already visible day keeps the scroll position, including across month boundaries.
 
 Arrow keys move focus by one day or week, with horizontal arrows respecting RTL. Space
 activates the focused day. Page Up/Down navigate pages. Tab and Shift-Tab leave the calendar
 normally. Set `userInterfaceLayoutDirection = .rightToLeft` for explicit RTL.
 
 Paged trackpad input accumulates and snaps once scrolling settles. Continuous months use
-native NSScrollView scrolling and pinned month headers. Heavy day grids use an LRU cache
+native NSScrollView scrolling, shared boundary weeks with no repeated dates, and a fixed month heading above the weekdays. Heavy day grids use an LRU cache
 capped at nine pages; section frames/row counts stay lightweight. Day accessibility IDs
 contain the civil date, month position and page anchor, so placeholders are distinguishable.
 

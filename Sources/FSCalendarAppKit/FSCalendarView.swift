@@ -61,7 +61,6 @@ import FSCalendarCore
         collectionView.collectionViewLayout = calendarLayout; collectionView.dataSource = controller; collectionView.delegate = controller
         collectionView.isSelectable = true; collectionView.allowsMultipleSelection = true; collectionView.backgroundColors = [.clear]
         collectionView.register(FSCalendarItem.self, forItemWithIdentifier: NSUserInterfaceItemIdentifier("default"))
-        collectionView.register(CalendarMonthHeader.self, forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader, withIdentifier: NSUserInterfaceItemIdentifier("month"))
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
         collectionView.setAccessibilityIdentifier("calendar-grid")
@@ -140,7 +139,22 @@ import FSCalendarCore
         guard !isMutating else { throw CalendarError.reentrantMutation }
         guard day >= configuration.minimumDate, day <= configuration.maximumDate else { throw CalendarError.outOfBounds(day) }
         _ = try day.date(in: configuration.timeZone)
-        if engine.pageID(containing: day, scope: mode.scope).anchor != page { try setCurrentPage(day) }
+        if mode.isContinuous {
+            layoutSubtreeIfNeeded()
+            let section = try engine.sectionIndex(for: day, scope: .month)
+            let index = IndexPath(item: day.day - 1, section: section)
+            if let frame = calendarLayout.layoutAttributesForItem(at: index)?.frame {
+                let visible = scrollView.contentView.bounds
+                var top = visible.minY
+                if frame.minY < visible.minY { top = frame.minY }
+                else if frame.maxY > visible.maxY { top = frame.maxY - visible.height }
+                let maximum = max(0, calendarLayout.collectionViewContentSize.height - visible.height)
+                scrollView.contentView.scroll(to: NSPoint(x: 0, y: min(maximum, max(0, top))))
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+            }
+        } else if engine.pageID(containing: day, scope: mode.scope).anchor != page {
+            try setCurrentPage(day)
+        }
         let old = focusedDay; focusedDay = day
         reload(dates: Set([old, day].compactMap { $0 }))
         NSAccessibility.post(element: self, notification: .focusedUIElementChanged)
@@ -150,7 +164,7 @@ import FSCalendarCore
     }
     func reconcileFocus() {
         guard let focusedDay else { return }
-        if !engine.isSelectable(focusedDay) || engine.pageID(containing: focusedDay, scope: mode.scope).anchor != page {
+        if !engine.isSelectable(focusedDay) || (!mode.isContinuous && engine.pageID(containing: focusedDay, scope: mode.scope).anchor != page) {
             self.focusedDay = firstEligibleDay()
         }
     }
@@ -205,16 +219,17 @@ import FSCalendarCore
 
     }
     func clamped(_ day: CivilDay) -> CivilDay { min(configuration.maximumDate, max(configuration.minimumDate, day)) }
-    func rowCount(_ day: CivilDay, scope: CalendarScope) -> Int {
+    func rowCount(_ day: CivilDay, scope: CalendarScope, continuous: Bool = false) -> Int {
         if scope == .week { return 1 }
-        if configuration.placeholders == .sixRows { return 6 }
+        if !continuous && configuration.placeholders == .sixRows { return 6 }
         return ((day.startOfMonth.weekday - configuration.firstWeekday + 7) % 7 + day.daysInMonth + 6) / 7
     }
-    func height(for day: CivilDay, mode: CalendarDisplayMode) -> CGFloat { metrics.headerHeight + metrics.weekdayHeight + CGFloat(rowCount(day, scope: mode.scope)) * metrics.rowHeight }
+    func height(for day: CivilDay, mode: CalendarDisplayMode) -> CGFloat { metrics.headerHeight + metrics.weekdayHeight + CGFloat(rowCount(day, scope: mode.scope, continuous: mode.isContinuous)) * metrics.rowHeight }
     func rebuild() {
         input.cancelScroll()
-        calendarLayout.mode = renderingMode; calendarLayout.rowHeight = metrics.rowHeight; calendarLayout.headerHeight = metrics.headerHeight
-        calendarLayout.rows = (0..<engine.pageCount(scope: renderingMode.scope)).compactMap { try? engine.page(at: $0, scope: renderingMode.scope) }.map { rowCount($0.anchor, scope: renderingMode.scope) }
+        calendarLayout.mode = renderingMode; calendarLayout.rowHeight = metrics.rowHeight
+        calendarLayout.continuousSections = renderingMode.isContinuous ? engine.continuousMonthSections() : []
+        calendarLayout.rows = (0..<engine.pageCount(scope: renderingMode.scope)).compactMap { try? engine.page(at: $0, scope: renderingMode.scope) }.map { rowCount($0.anchor, scope: renderingMode.scope, continuous: renderingMode.isContinuous) }
         calendarLayout.invalidateLayout(); reloadData(); updateHeader(); notifyHeight(animated: false)
         needsPagePosition = true; needsLayout = true
     }
@@ -257,8 +272,7 @@ import FSCalendarCore
         if transition != nil, lastSize != .zero,
            abs(bounds.width - lastSize.width) > 0.5 || (abs(bounds.height - lastSize.height) > 0.5 && abs(bounds.height - preferredHeight) > 1) { cancelTransition() }
         let appearance = metrics
-        let headerHeight: CGFloat = renderingMode.isContinuous ? 0 : appearance.headerHeight
-        titleLabel.isHidden = renderingMode.isContinuous
+        let headerHeight = appearance.headerHeight
         titleLabel.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         for (index, label) in weekdayLabels.enumerated() {
             label.frame = NSRect(x: CGFloat(index) * bounds.width / 7, y: headerHeight, width: bounds.width / 7, height: appearance.weekdayHeight)

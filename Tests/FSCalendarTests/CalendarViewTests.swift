@@ -74,6 +74,110 @@ final class CalendarViewTests: XCTestCase {
         wait(for: [matched], timeout: 3)
     }
 
+    @MainActor func testContinuousBoundarySelectionReloadHeadingAndScopeRoundTrip() throws {
+        let view = FSCalendar(frame: CGRect(x: 0, y: 0, width: 350, height: 400))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let controller = UIViewController(); window.rootViewController = controller
+        controller.view.addSubview(view); window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        let leapDay = try CivilDay(year: 2024, month: 2, day: 29)
+        let march = try CivilDay(year: 2024, month: 3, day: 1)
+        for placeholders: PlaceholderMode in [.none, .variable, .sixRows] {
+            try view.apply(configuration: CalendarConfiguration(placeholders: placeholders,
+                minimumDate: CivilDay(year: 2024, month: 2, day: 10),
+                maximumDate: CivilDay(year: 2024, month: 3, day: 20),
+                timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX"), selectionMode: .multiple))
+            try view.setDisplayMode(.continuousMonths, animated: false)
+            try view.setCurrentPage(march, animated: false)
+            view.layoutIfNeeded(); view.collectionView.layoutIfNeeded()
+            XCTAssertEqual(view.currentPage, march)
+            XCTAssertEqual(view.titleLabel.text, "March 2024")
+            XCTAssertEqual(view.calendarLayout.itemCount(in: 0), 29)
+            XCTAssertEqual(view.calendarLayout.itemCount(in: 1), 31)
+            XCTAssertFalse(try XCTUnwrap(view.grid(in: 0)).occurrences[8].isSelectable)
+            let headingFrame = view.titleLabel.frame
+            XCTAssertGreaterThan(headingFrame.height, 0)
+            let cells = view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }
+            let days = cells.compactMap { $0.dayState?.occurrence.day }
+            XCTAssertEqual(Set(days).count, days.count)
+            XCTAssertTrue(cells.allSatisfy { $0.dayState?.occurrence.position == .current })
+            let last = try XCTUnwrap(cells.first { $0.dayState?.occurrence.day == leapDay })
+            let first = try XCTUnwrap(cells.first { $0.dayState?.occurrence.day == march })
+            XCTAssertEqual(last.frame.minY, first.frame.minY, accuracy: 0.01)
+            XCTAssertEqual(last.frame.maxX, first.frame.minX, accuracy: 0.01)
+            try view.setSelection([leapDay, march])
+            XCTAssertEqual(last.dayState?.isSelected, true)
+            XCTAssertEqual(first.dayState?.isSelected, true)
+            view.today = leapDay; view.reload(dates: [leapDay, march])
+            XCTAssertEqual(last.dayState?.isToday, true)
+
+            var point = view.calendarLayout.offset(for: 1)
+            point.y -= view.calendarLayout.rowHeight
+            view.collectionView.setContentOffset(point, animated: false)
+            XCTAssertEqual(view.currentPage, leapDay.startOfMonth)
+            XCTAssertEqual(view.titleLabel.text, "February 2024")
+            point = view.calendarLayout.offset(for: 1)
+            view.collectionView.setContentOffset(point, animated: false)
+            XCTAssertEqual(view.currentPage, march)
+            XCTAssertEqual(view.titleLabel.frame, headingFrame)
+            try view.setDisplayMode(.week, animated: false)
+            try view.setDisplayMode(.continuousMonths, animated: false)
+            view.layoutIfNeeded(); view.collectionView.layoutIfNeeded()
+            XCTAssertEqual(view.selectedDays, [leapDay, march])
+            XCTAssertEqual(view.currentPage, march)
+            XCTAssertLessThanOrEqual(view.cachedPageCount, 9)
+        }
+    }
+    @MainActor func testContinuousSharedWeeksGeometryAndNavigation() throws {
+
+        let minimum = try CivilDay(year: 2023, month: 12, day: 15)
+        let maximum = try CivilDay(year: 2024, month: 3, day: 20)
+        for weekday in 1...7 {
+            let engine = try CalendarEngine(configuration: CalendarConfiguration(firstWeekday: weekday,
+                minimumDate: minimum, maximumDate: maximum))
+            for rtl in [false, true] {
+                let layout = CalendarCollectionLayout()
+                layout.mode = .continuousMonths; layout.rowHeight = 45.4121; layout.isRTL = rtl
+                layout.continuousSections = engine.continuousMonthSections()
+                layout.rows = layout.continuousSections.map(\.rowCount)
+                let collection = UICollectionView(frame: CGRect(x: 0, y: 0, width: 350, height: 400), collectionViewLayout: layout)
+                _ = collection
+                layout.prepare()
+                var frames: [CGRect] = []
+                for (section, month) in layout.continuousSections.enumerated() {
+                    XCTAssertEqual(layout.itemCount(in: section), month.dayCount)
+                    let offset = layout.offset(for: section)
+                    XCTAssertEqual(layout.section(at: offset), section)
+                    if section > 0 {
+                        XCTAssertEqual(layout.section(at: CGPoint(x: 0, y: offset.y - 1)), section - 1)
+                    }
+                    for item in 0..<month.dayCount {
+                        let index = IndexPath(item: item, section: section)
+                        let frame = try XCTUnwrap(layout.layoutAttributesForItem(at: index)).frame
+                        let day = try month.page.anchor.addingDays(item)
+                        let column = (day.weekday - weekday + 7) % 7
+                        XCTAssertEqual(frame.minX, CGFloat(rtl ? 6 - column : column) * 50, accuracy: 0.0001)
+                        if let previous = frames.last {
+                            let sameRow = column != 0
+                            XCTAssertEqual(frame.minY, previous.minY + (sameRow ? 0 : layout.rowHeight), accuracy: 0.0001)
+                            if sameRow {
+                                XCTAssertEqual(rtl ? frame.maxX : previous.maxX, rtl ? previous.minX : frame.minX, accuracy: 0.0001)
+                            }
+                        }
+                        frames.append(frame)
+                    }
+                    if section > 0, month.startSlot % 7 != 0 {
+                        let rect = CGRect(x: 0, y: offset.y + 1, width: 350, height: layout.rowHeight - 2)
+                        let attributes = layout.layoutAttributesForElements(in: rect) ?? []
+                        XCTAssertEqual(attributes.count, 7)
+                        XCTAssertEqual(Set(attributes.map(\.indexPath.section)), [section - 1, section])
+                    }
+                }
+                let last = layout.continuousSections.count - 1
+                XCTAssertGreaterThanOrEqual(layout.collectionViewContentSize.height, layout.offset(for: last).y + 400)
+            }
+        }
+    }
     @MainActor func testSelectionBounceOnlyForAcceptedAdditionsAndClearsOnReuse() throws {
         let view = try make(.multiple)
         let (window, spy) = hostForAnimation(view)
@@ -134,12 +238,20 @@ final class CalendarViewTests: XCTestCase {
         let (window, spy) = hostForAnimation(view)
         defer { window.isHidden = true }
         let monthHeight = view.preferredHeight
+        view.reduceMotionOverride = false
+        let pixel = 1 / max(1, view.traitCollection.displayScale)
+        waitForAnimationFrame("Initial month frame is presented") {
+            abs((view.layer.presentation()?.bounds.height ?? 0) - monthHeight) <= pixel
+        }
         try view.beginInteractiveTransition(to: .week)
         view.updateInteractiveTransition(progress: 0.6)
         let dragHeight = view.preferredHeight
+        waitForAnimationFrame("Interactive height is presented before cancellation") {
+            abs((view.layer.presentation()?.bounds.height ?? 0) - dragHeight) <= pixel
+        }
         view.finishInteractiveTransition(commit: false, animated: true)
         XCTAssertEqual(view.transition?.animator?.duration, 0.3)
-        waitUntil("Cancellation animates through intermediate height") {
+        waitForAnimationFrame("Cancellation animates through intermediate height") {
             guard let height = view.layer.presentation()?.bounds.height else { return false }
             return height > dragHeight + 0.1 && height < monthHeight - 0.1
         }
@@ -159,16 +271,21 @@ final class CalendarViewTests: XCTestCase {
         let (window, spy) = hostForAnimation(view)
         defer { window.isHidden = true }
         let shortHeight = view.preferredHeight
+        view.reduceMotionOverride = false
+        let pixel = 1 / max(1, view.traitCollection.displayScale)
+        waitForAnimationFrame("Initial month frame is presented") {
+            abs((view.layer.presentation()?.bounds.height ?? 0) - shortHeight) <= pixel
+        }
         try view.setCurrentPage(CivilDay(year: 2024, month: 3, day: 1), animated: true)
         let tallHeight = view.preferredHeight
-        waitUntil("Month height animates between endpoints") {
+        waitForAnimationFrame("Month height animates between endpoints") {
             guard let height = view.layer.presentation()?.bounds.height else { return false }
             return height > shortHeight + 0.1 && height < tallHeight - 0.1
         }
         try view.setCurrentPage(CivilDay(year: 2024, month: 2, day: 1), animated: true)
         waitUntil("Reversal reaches the latest height") {
             guard let height = view.layer.presentation()?.bounds.height else { return false }
-            return abs(height - shortHeight) < 0.1
+            return abs(height - shortHeight) <= pixel
         }
         XCTAssertEqual(view.currentPage, try CivilDay(year: 2024, month: 2, day: 1))
         XCTAssertEqual(view.bounds.height, shortHeight, accuracy: 0.5)
@@ -469,14 +586,17 @@ final class CalendarViewTests: XCTestCase {
     }
     @MainActor func testRepeatedNavigationKeepsDetailedCacheBounded() throws {
         let view = try make()
-        for year in 2020...2029 {
-            for month in 1...12 {
-                try view.setCurrentPage(CivilDay(year: year, month: month, day: 1), animated: false)
-                view.layoutIfNeeded()
+        for mode: CalendarDisplayMode in [.month(.horizontal), .continuousMonths] {
+            try view.setDisplayMode(mode, animated: false)
+            for year in 2020...2029 {
+                for month in 1...12 {
+                    try view.setCurrentPage(CivilDay(year: year, month: month, day: 1), animated: false)
+                    view.layoutIfNeeded()
+                }
             }
+            XCTAssertLessThanOrEqual(view.cachedPageCount, 9)
+            XCTAssertGreaterThan(view.cachedPageCount, 0)
         }
-        XCTAssertLessThanOrEqual(view.cachedPageCount, 9)
-        XCTAssertGreaterThan(view.cachedPageCount, 0)
     }
     @MainActor func testWeekHeightAndIntrinsicSizing() throws {
         let view = try make()
@@ -506,18 +626,11 @@ final class CalendarViewTests: XCTestCase {
         try view.deselect(a)
         XCTAssertFalse(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.contains { $0.dayState?.occurrence.day == a && $0.isSelected })
     }
-    @MainActor func testStickyHeadersAndRTLGeometry() throws {
+    @MainActor func testRTLGeometry() throws {
         let layout = CalendarCollectionLayout()
-        layout.rows = [4, 6]; layout.rowHeight = 44; layout.headerHeight = 40
-        layout.mode = .continuousMonths
+        layout.rows = [4, 6]; layout.rowHeight = 44
         let collection = UICollectionView(frame: CGRect(x: 0, y: 0, width: 350, height: 300), collectionViewLayout: layout)
-        layout.prepare()
-        collection.contentOffset.y = 80
-        let header = try XCTUnwrap(layout.layoutAttributesForSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, at: IndexPath(item: 0, section: 0)))
-        XCTAssertEqual(header.frame.minY, 80)
-        XCTAssertEqual(header.zIndex, 100)
-        collection.contentOffset.y = 200
-        XCTAssertEqual(layout.layoutAttributesForSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, at: IndexPath(item: 0, section: 0))?.frame.minY, 176)
+        _ = collection
         layout.mode = .month(.horizontal); layout.isRTL = true; layout.prepare()
         let first = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)))
         XCTAssertEqual(first.frame.minX, 650)

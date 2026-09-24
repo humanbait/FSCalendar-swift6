@@ -18,7 +18,7 @@ The runner stops only its own process after 180 seconds without output or 30 min
 
 - Core: leap years, seven first weekdays, month/week boundaries, row counts, DST, skipped civil days, inclusive bounds, date/index/page round trips, invalid/overflow inputs.
 - Selection: order, deduplication, atomic replacement, validation, no-op proposals, configuration pruning.
-- UIKit contracts: callbacks, veto/reentry, placeholder synchronization, cancellation/replacement/resize, intrinsic height, Dynamic Type, finite geometry, sticky headers/RTL, fractional-height continuous navigation, bounded cache over 120 months.
+- UIKit contracts: callbacks, veto/reentry, placeholder synchronization, cancellation/replacement/resize, intrinsic height, Dynamic Type, finite geometry, fixed continuous heading/shared boundary weeks/RTL, fractional-height continuous navigation, bounded cache over 120 months.
 - Demo: all 19 Swift scenarios, selection/reload persistence, custom title/subtitle/image/events after reuse.
 - UI: tap/reset, paging persistence, repeated scope changes/rotation, custom range cells, a dedicated combined-usage connected range with continuous month scrolling and button-only scope changes, swipe selection, continuous scrolling, vertical paging, interactive scope round trip, bounds, five appearance screens, launch measurements, week navigation, dynamic row height, and an iOS 17 accessibility-description audit.
 
@@ -56,3 +56,37 @@ the explicit Mac destination. Every run records source hashes (including uncommi
 Git revision/status, hardware, OS, compiler, fixtures, logs, `.xcresult`, exported screenshots
 and metrics. Passing runs reopen the Mac demo. See [AppKit integration](APPKIT.md) and
 [Mac validation](MACOS-VALIDATION.md) for evidence and remaining runtime release gates.
+
+## Continuous-month validation — 2026-09-24
+
+Validated with Xcode 27.1 (27A9269), Swift 6.4 in Swift 6 language mode,
+macOS 27.0 (26A428, arm64), and a physical iPhone 11 running iOS 17.7.2 (21H221).
+
+| Check | Result | Local evidence under `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 38 passed | `continuous-20260924T052756Z/package.log` |
+| Full `test-macos.sh --destination 'platform=macOS,arch=arm64'` | 33 hosted/UI tests passed | `continuous-20260924T052756Z/` |
+| Physical iOS hosted suite plus connected-range UI test | 61 passed | `continuous-final-20260924T053629302552Z/` |
+| Physical iOS swipe-height UI test, isolated | 1 passed | `swipe-final-20260924T053801056184Z/` |
+| Physical iOS main scenario matrix and animation-parity UI test | Both passed in the initial mixed-result run | `continuous-20260924T052812853939Z/` |
+
+All 64 distinct iOS tests passed across these runs; the initial full run itself failed.
+It exposed two animation-test synchronization failures and lost the `testmanagerd`
+connection while launching two standalone UI tests. Animation checks now wait for a
+presented starting frame, observe intermediate frames using the existing frame timer,
+and allow one display pixel when comparing rendered endpoints. They pass in isolation
+and in the final full hosted suite. Both interrupted UI cases passed in fresh sessions;
+no library behavior or assertions were disabled to recover them.
+
+New coverage checks unique owned-month dates, shared rows for all seven first weekdays
+and all placeholder modes, leap/year boundaries, skipped civil days, selection bounds,
+RTL, fractional row heights, final-month alignment, heading updates, targeted reloads,
+AppKit focus across month boundaries, scope round trips, and bounded caches. Window-hosted
+and UI tests verify a connected February 29–March 1 band. Exported
+`appkit-connected-range-continuous` and `swift-connected-range-continuous` screenshots
+were visually checked: each shows those dates beside one another with no repeated week.
+
+Library and Mac test sources were unchanged after the full Mac pass. Subsequent edits
+only stabilized UIKit animation checks, extended UIKit cache coverage, and recorded this
+evidence. Exact Swift 6.2, iOS 16, macOS 13, and manual VoiceOver validation remain separate
+gates; these runs do not establish those configurations.

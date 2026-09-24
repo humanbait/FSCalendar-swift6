@@ -81,7 +81,8 @@ final class MacUITests: XCTestCase {
         let readout = app.textFields["state.readout"]
         XCTAssertFalse(app.buttons["scope.handle"].isHittable)
         func click(_ date: String) {
-            let day = app.buttons["day.\(date).1.2024-02-01"]
+            let month = String(date.prefix(7)) + "-01"
+            let day = app.buttons["day.\(date).1.\(month)"]
             XCTAssertTrue(day.waitForExistence(timeout: 5))
             day.click()
         }
@@ -96,12 +97,19 @@ final class MacUITests: XCTestCase {
         let beforeInsideTap = readout.value as? String
         click("2024-02-19")
         XCTAssertEqual(readout.value as? String, beforeInsideTap)
+        click("2024-02-29"); click("2024-03-01"); waitFor("2024-03-01")
+        let february = app.buttons["day.2024-02-29.1.2024-02-01"]
+        let march = app.buttons["day.2024-03-01.1.2024-03-01"]
+        XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)
+        XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 1)
         let image = XCTAttachment(screenshot: app.screenshot())
         image.name = "appkit-connected-range-continuous"
         image.lifetime = .keepAlways
         add(image)
+        let beforeScroll = readout.value as? String ?? ""
         app.scrollViews["calendar.scroll"].scroll(byDeltaX: 0, deltaY: -400)
-        waitFor("2024-03-01")
+        expectation(for: NSPredicate(format: "value != %@", beforeScroll), evaluatedWith: readout)
+        waitForExpectations(timeout: 5)
         XCTAssertTrue((readout.value as? String ?? "").contains("• month"))
         XCTAssertTrue((readout.value as? String ?? "").contains("2024-02-21"))
         app.buttons["scope.toggle"].click()

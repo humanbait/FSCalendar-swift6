@@ -64,7 +64,7 @@ extension FSCalendar {
         let renderedMode = changesScope ? (mode.scope == .month ? mode : target) : target
         let renderedPage = changesScope && mode.scope == .month ? page : targetPage
         let sourceHeight = height(for: mode, page: page), targetHeight = height(for: target, page: targetPage)
-        let gridHeight = CGFloat(rowCount(for: renderedPage, scope: renderedMode.scope)) * effectiveRowHeight
+        let gridHeight = CGFloat(rowCount(for: renderedPage, scope: renderedMode.scope, continuous: renderedMode.isContinuous)) * effectiveRowHeight
         let context = CalendarTransition(sourceMode: mode, targetMode: target, sourcePage: page,
                                          targetPage: targetPage, renderMode: renderedMode, renderPage: renderedPage,
                                          sourceHeight: sourceHeight, targetHeight: targetHeight, renderGridHeight: gridHeight)

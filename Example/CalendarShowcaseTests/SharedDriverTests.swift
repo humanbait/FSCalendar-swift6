@@ -150,6 +150,20 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertGreaterThan(friday.selectionBackground.frame.maxX, friday.contentView.bounds.maxX)
         XCTAssertLessThan(saturday.selectionBackground.frame.minX, saturday.contentView.bounds.minX)
 
+        let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+        try driver.calendar.setSelection(boundary)
+        try driver.calendar.setCurrentPage(boundary[1], animated: false)
+        driver.calendar.reloadData(); driver.view.layoutIfNeeded()
+        let boundaryCells = cells(in: driver.view).compactMap { $0 as? ConnectedRangeSwiftCell }
+        let february = try XCTUnwrap(boundaryCells.first { $0.dayState?.occurrence.day == boundary[0] })
+        let march = try XCTUnwrap(boundaryCells.first { $0.dayState?.occurrence.day == boundary[1] })
+        XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 0.5)
+        XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 0.5)
+        XCTAssertEqual(february.selectionBackground.layer.maskedCorners, left)
+        XCTAssertEqual(march.selectionBackground.layer.maskedCorners, right)
+        XCTAssertEqual(boundaryCells.filter { $0.dayState?.occurrence.day == boundary[0] }.count, 1)
+        try driver.calendar.setCurrentPage(days[0], animated: false)
+
         try driver.calendar.setSelection([days[4]])
         driver.calendar.reloadData(); driver.view.layoutIfNeeded()
         let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,

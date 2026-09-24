@@ -85,8 +85,7 @@ import FSCalendarCore
         let days = visibleItems().filter { !$0.view.isHidden && $0.view.frame.intersects(visibleRect) }
             .sorted { (($0 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "") < (($1 as? FSCalendarItem)?.dayState?.occurrence.day.description ?? "") }
             .map(\.view)
-        let headers = visibleSupplementaryViews(ofKind: NSCollectionView.elementKindSectionHeader).filter { $0.frame.intersects(visibleRect) }
-        return headers + days
+        return days
     }
     override func setFrameSize(_ newSize: NSSize) {
         let content = collectionViewLayout?.collectionViewContentSize ?? .zero

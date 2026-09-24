@@ -7,7 +7,7 @@ import FSCalendarCore
     var mode: CalendarDisplayMode = .month(.horizontal) { didSet { invalidateGeometry() } }
     var rows: [Int] = [] { didSet { invalidateGeometry() } }
     var rowHeight: CGFloat = 44 { didSet { invalidateGeometry() } }
-    var headerHeight: CGFloat = 44 { didSet { invalidateGeometry() } }
+    var continuousSections: [ContinuousMonthSection] = [] { didSet { invalidateGeometry() } }
     var isRTL = false { didSet { if oldValue != isRTL { invalidateGeometry() } } }
     private var frames: [CGRect] = []
     private var size: CGSize = .zero
@@ -17,20 +17,19 @@ import FSCalendarCore
     private func invalidateGeometry() { geometryIsDirty = true; invalidateLayout() }
     override func prepare() {
         super.prepare()
-        guard let collectionView else { return }
+        guard collectionView != nil else { return }
         let viewport = self.viewport
         guard geometryIsDirty || viewport != preparedSize else { return }
         preparedSize = viewport; geometryIsDirty = false
         frames.removeAll(keepingCapacity: true)
         if mode.isContinuous {
-            var top: CGFloat = 0
-            for count in rows {
-                let scale = max(1, collectionView.window?.backingScaleFactor ?? 1)
-                let height = ceil((headerHeight + CGFloat(count) * rowHeight) * scale) / scale
-                frames.append(CGRect(x: 0, y: top, width: viewport.width, height: height))
-                top += height
+            for section in continuousSections {
+                frames.append(CGRect(x: 0, y: CGFloat(section.firstRow) * rowHeight,
+                                     width: viewport.width, height: CGFloat(section.rowCount) * rowHeight))
             }
-            size = CGSize(width: viewport.width, height: top)
+            // Allow the final month's first week to reach the fixed heading even in a tall viewport.
+            let bottom = frames.last.map { max($0.maxY, $0.minY + viewport.height) } ?? 0
+            size = CGSize(width: viewport.width, height: bottom)
         } else {
             for index in rows.indices {
                 let visual = mode.isHorizontal && isRTL ? rows.count - 1 - index : index
@@ -55,9 +54,9 @@ import FSCalendarCore
             while low < high {
                 let mid = (low + high) / 2
                 let pixel = 1 / max(1, collectionView?.window?.backingScaleFactor ?? 1)
-                if frames[mid].maxY <= offset.y + pixel * 0.5 { low = mid + 1 } else { high = mid }
+                if frames[mid].minY <= offset.y + pixel * 0.5 { low = mid + 1 } else { high = mid }
             }
-            return min(frames.count - 1, low)
+            return max(0, min(frames.count - 1, low - 1))
         }
         let length = mode.isHorizontal ? preparedSize.width : preparedSize.height
         guard length > 0 else { return 0 }
@@ -66,10 +65,13 @@ import FSCalendarCore
         return mode.isHorizontal && isRTL ? frames.count - 1 - visual : visual
     }
     override func layoutAttributesForElements(in rect: CGRect) -> [NSCollectionViewLayoutAttributes] {
+        prepare()
         guard !frames.isEmpty else { return [] }
         let sections: [Int]
         if mode.isContinuous {
-            let first = section(at: CGPoint(x: 0, y: rect.minY))
+            var first = section(at: CGPoint(x: 0, y: rect.minY))
+            // The preceding month may still own cells in this shared boundary row.
+            if first > 0, frames[first - 1].maxY > rect.minY { first -= 1 }
             var last = first
             while last + 1 < frames.count && frames[last + 1].minY < rect.maxY { last += 1 }
             sections = Array(first...last)
@@ -83,39 +85,34 @@ import FSCalendarCore
         }
         var attributes: [NSCollectionViewLayoutAttributes] = []
         for section in sections {
-            for item in 0..<(rows[section] * 7) {
+            for item in 0..<itemCount(in: section) {
                 if let a = layoutAttributesForItem(at: IndexPath(item: item, section: section)), a.frame.intersects(rect) {
                     attributes.append(a)
                 }
-            }
-            if mode.isContinuous, let header = layoutAttributesForSupplementaryView(ofKind: NSCollectionView.elementKindSectionHeader,
-                                                                                     at: IndexPath(item: 0, section: section)) {
-                attributes.append(header)
             }
         }
         return attributes
     }
     override func layoutAttributesForItem(at indexPath: IndexPath) -> NSCollectionViewLayoutAttributes? {
-        guard frames.indices.contains(indexPath.section), indexPath.item < rows[indexPath.section] * 7 else { return nil }
+        prepare()
+        guard frames.indices.contains(indexPath.section), indexPath.item >= 0,
+              indexPath.item < itemCount(in: indexPath.section) else { return nil }
         let page = frames[indexPath.section]
         let width = page.width / 7
         let height = mode.isContinuous ? rowHeight : page.height / CGFloat(rows[indexPath.section])
-        let column = isRTL ? 6 - indexPath.item % 7 : indexPath.item % 7
+        let slot = mode.isContinuous ? continuousSections[indexPath.section].startSlot + indexPath.item : indexPath.item
+        let column = isRTL ? 6 - slot % 7 : slot % 7
         let attribute = NSCollectionViewLayoutAttributes(forItemWith: indexPath)
         attribute.frame = CGRect(x: page.minX + CGFloat(column) * width,
-                                 y: page.minY + (mode.isContinuous ? headerHeight : 0) + CGFloat(indexPath.item / 7) * height,
+                                 y: (mode.isContinuous ? 0 : page.minY) + CGFloat(slot / 7) * height,
                                  width: width, height: height)
         return attribute
     }
-    override func layoutAttributesForSupplementaryView(ofKind elementKind: String, at indexPath: IndexPath) -> NSCollectionViewLayoutAttributes? {
-        guard mode.isContinuous, elementKind == NSCollectionView.elementKindSectionHeader,
-              frames.indices.contains(indexPath.section) else { return nil }
-        let page = frames[indexPath.section]
-        let attribute = NSCollectionViewLayoutAttributes(forSupplementaryViewOfKind: elementKind, with: indexPath)
-        let top = min(page.maxY - headerHeight, max(page.minY, collectionView?.enclosingScrollView?.contentView.bounds.minY ?? 0))
-        attribute.frame = CGRect(x: 0, y: top, width: page.width, height: headerHeight)
-        attribute.zIndex = 100
-        return attribute
+    func itemCount(in section: Int) -> Int {
+        if mode.isContinuous {
+            return continuousSections.indices.contains(section) ? continuousSections[section].dayCount : 0
+        }
+        return rows.indices.contains(section) ? rows[section] * 7 : 0
     }
     override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
         mode.isContinuous

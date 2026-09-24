@@ -19,6 +19,29 @@ The rewrite preserves shared capabilities while making the following deliberate 
 
 `FSCalendar` and its UIKit callbacks are main-actor isolated. Content providers remain synchronous. Applications own asynchronous loading and call targeted reloads after updating their data.
 
+## Continuous months
+
+`.continuousMonths` presents one uninterrupted grid of civil weeks in UIKit and AppKit.
+Each month supplies only its own dates, with `.current` occurrence position and its actual
+month as the page identity. Neighboring months share a boundary row; no date is repeated.
+Placeholder settings, including six-row padding, apply only to paged month presentation.
+The first and last months remain complete: dates outside selection bounds are disabled,
+and unused weekday slots at the outer edges are blank.
+
+A fixed month/year heading sits above the weekdays. `currentPage` and the heading identify
+the latest month whose first week has reached the viewport top, including a partially
+visible boundary week. `setCurrentPage` and month navigation align that first week at the
+top. Trailing scroll space lets the final month reach the same alignment in tall viewports.
+RTL mirrors weekday columns without changing chronological row order. A viewport height
+is still required; continuous mode has no intrinsic height for the entire range.
+
+`CalendarEngine.continuousMonthSections()` returns lightweight `ContinuousMonthSection`
+values (`page`, `startSlot`, `dayCount`, `firstRow`, `rowCount`). Slots are measured from the
+week containing the first displayed month. `continuousMonthGrid(containing:)` returns
+only the requested month's dates; its row count includes shared boundary rows, so its
+occurrence count is not necessarily `rowCount * 7`. Existing month/week grid APIs retain
+their padded grids. Renderers retain at most nine detailed month grids.
+
 ## Selection transaction
 
 Validate the complete proposed selection, consult a synchronous veto, commit once, update all visible occurrences, and issue one change notification. Changes carry additions, removals, resulting order, and user/programmatic/configuration origin. Reentrant mutation during a transaction must be rejected explicitly. Configuration pruning is mandatory and bypasses vetoes.

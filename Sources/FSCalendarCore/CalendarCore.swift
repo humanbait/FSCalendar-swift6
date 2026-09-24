@@ -161,6 +161,16 @@ public struct CalendarGrid: Hashable, Sendable {
     public let occurrences: [DayOccurrence]
 }
 
+/// A month's position in an uninterrupted grid of civil weeks.
+/// Slots start at the first weekday of the week containing the first displayed month.
+public struct ContinuousMonthSection: Hashable, Sendable {
+    public let page: PageID
+    public let startSlot: Int
+    public let dayCount: Int
+    public var firstRow: Int { startSlot / 7 }
+    public var rowCount: Int { (startSlot % 7 + dayCount + 6) / 7 }
+}
+
 public struct CalendarEngine: Sendable {
     public let configuration: CalendarConfiguration
     public init(configuration: CalendarConfiguration) throws { self.configuration = configuration }
@@ -208,6 +218,29 @@ public struct CalendarEngine: Sendable {
                                  isHidden: hidden, isSelectable: !hidden && isSelectable(date))
         }
         return CalendarGrid(id: id, rowCount: rows, occurrences: cells)
+    }
+    /// Lightweight geometry for all displayed months; boundary weeks are shared.
+    public func continuousMonthSections() -> [ContinuousMonthSection] {
+        let first = configuration.minimumDate.startOfMonth
+        let leading = CivilDay.modulo(first.weekday - configuration.firstWeekday, 7)
+        return (0..<pageCount(scope: .month)).map { index in
+            // The validated date range guarantees every month index is representable.
+            let anchor = try! first.addingMonths(index)
+            return ContinuousMonthSection(page: PageID(anchor: anchor, scope: .month),
+                startSlot: leading + first.distance(to: anchor), dayCount: anchor.daysInMonth)
+        }
+    }
+    /// Contains only this month's dates, each owned by its actual month.
+    /// `rowCount` includes shared boundary rows; occurrences are not padded to seven slots.
+    public func continuousMonthGrid(containing day: CivilDay) throws -> CalendarGrid {
+        let id = pageID(containing: day, scope: .month)
+        let leading = CivilDay.modulo(id.anchor.weekday - configuration.firstWeekday, 7)
+        let cells = (0..<id.anchor.daysInMonth).map { index in
+            let date = CivilDay(ordinal: id.anchor.ordinal + index)
+            return DayOccurrence(id: CellOccurrenceID(page: id, day: date), position: .current,
+                                 isHidden: false, isSelectable: isSelectable(date))
+        }
+        return CalendarGrid(id: id, rowCount: (leading + cells.count + 6) / 7, occurrences: cells)
     }
     public func index(of day: CivilDay, in grid: CalendarGrid) -> Int? {
         guard let first = grid.occurrences.first else { return nil }

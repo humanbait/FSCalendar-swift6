@@ -69,6 +69,7 @@ import FSCalendarCore
         today = try? CivilDay(date: Date(), timeZone: configuration.timeZone)
         page = engine.pageID(containing: clamped(today ?? configuration.minimumDate), scope: .month).anchor
         titleLabel.textAlignment = .center; titleLabel.accessibilityTraits = .header
+        titleLabel.accessibilityIdentifier = "calendar.heading"
         titleLabel.adjustsFontForContentSizeCategory = true
         weekdayStack.axis = .horizontal; weekdayStack.distribution = .fillEqually
         weekdayStack.semanticContentAttribute = .forceLeftToRight // Order is assigned explicitly with the grid columns.
@@ -82,7 +83,6 @@ import FSCalendarCore
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.showsHorizontalScrollIndicator = false; collectionView.showsVerticalScrollIndicator = false
         collectionView.register(FSCalendarCell.self, forCellWithReuseIdentifier: "default")
-        collectionView.register(CalendarMonthHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "month")
         scopeGesture.delegate = self; clipView.addGestureRecognizer(scopeGesture)
         selectionGesture.minimumPressDuration = 0.25; selectionGesture.isEnabled = false
         collectionView.addGestureRecognizer(selectionGesture)
@@ -182,7 +182,7 @@ import FSCalendarCore
         let needsRepositionForSize = bounds.width != lastBoundsSize.width ||
             (bounds.height != lastBoundsSize.height && !renderingMode.isHorizontal)
         lastBoundsSize = bounds.size
-        let headerHeight = renderingMode.isContinuous ? 0 : effectiveHeaderHeight
+        let headerHeight = effectiveHeaderHeight
         titleLabel.frame = CGRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         weekdayStack.frame = CGRect(x: 0, y: headerHeight, width: bounds.width, height: effectiveWeekdayHeight)
         let top = headerHeight + effectiveWeekdayHeight
@@ -216,15 +216,15 @@ import FSCalendarCore
     }
     var effectiveHeaderHeight: CGFloat { max(resolvedAppearance.headerHeight, resolvedAppearance.headerFont.lineHeight + 12) }
     var effectiveWeekdayHeight: CGFloat { max(resolvedAppearance.weekdayHeight, resolvedAppearance.weekdayFont.lineHeight + 4) }
-    func rowCount(for day: CivilDay, scope: CalendarScope) -> Int {
+    func rowCount(for day: CivilDay, scope: CalendarScope, continuous: Bool = false) -> Int {
         guard scope == .month else { return 1 }
-        if configuration.placeholders == .sixRows { return 6 }
+        if !continuous && configuration.placeholders == .sixRows { return 6 }
         let month = day.startOfMonth
         let leading = (month.weekday - configuration.firstWeekday + 7) % 7
         return (leading + month.daysInMonth + 6) / 7
     }
     func height(for mode: CalendarDisplayMode, page: CivilDay) -> CGFloat {
-        effectiveHeaderHeight + effectiveWeekdayHeight + CGFloat(rowCount(for: page, scope: mode.scope)) * effectiveRowHeight
+        effectiveHeaderHeight + effectiveWeekdayHeight + CGFloat(rowCount(for: page, scope: mode.scope, continuous: mode.isContinuous)) * effectiveRowHeight
     }
     func clamped(_ day: CivilDay) -> CivilDay { min(configuration.maximumDate, max(configuration.minimumDate, day)) }
     func refreshAppearance() {
@@ -253,10 +253,11 @@ import FSCalendarCore
     func rebuild(mode: CalendarDisplayMode) {
         renderingMode = mode
         calendarLayout.mode = mode
-        calendarLayout.rowHeight = effectiveRowHeight; calendarLayout.headerHeight = effectiveHeaderHeight
+        calendarLayout.rowHeight = effectiveRowHeight
+        calendarLayout.continuousSections = mode.isContinuous ? engine.continuousMonthSections() : []
         calendarLayout.rows = (0..<engine.pageCount(scope: mode.scope)).map { index in
             guard let id = try? engine.page(at: index, scope: mode.scope) else { return 0 }
-            return rowCount(for: id.anchor, scope: mode.scope)
+            return rowCount(for: id.anchor, scope: mode.scope, continuous: mode.isContinuous)
         }
         collectionView.isPagingEnabled = !mode.isContinuous
         updateGestureAvailability(); reloadData()
@@ -279,7 +280,9 @@ import FSCalendarCore
             cacheOrder.removeAll { $0 == id }; cacheOrder.append(id)
             return cached
         }
-        guard let grid = try? engine.grid(containing: id.anchor, scope: id.scope) else { return nil }
+        guard let grid = try? renderingMode.isContinuous
+            ? engine.continuousMonthGrid(containing: id.anchor)
+            : engine.grid(containing: id.anchor, scope: id.scope) else { return nil }
         gridCache[id] = grid; cacheOrder.append(id)
         while cacheOrder.count > 9 { gridCache.removeValue(forKey: cacheOrder.removeFirst()) }
         return grid
@@ -293,7 +296,7 @@ import FSCalendarCore
         if configuration.selectionMode == .disabled { cell.accessibilityTraits.insert(.notEnabled) }
     }
     public func numberOfSections(in collectionView: UICollectionView) -> Int { calendarLayout.rows.count }
-    public func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { calendarLayout.rows[section] * 7 }
+    public func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { calendarLayout.itemCount(in: section) }
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let grid = grid(in: indexPath.section), grid.occurrences.indices.contains(indexPath.item) else {
             return collectionView.dequeueReusableCell(withReuseIdentifier: "default", for: indexPath)
@@ -304,14 +307,6 @@ import FSCalendarCore
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: identifier, for: indexPath) as! FSCalendarCell
         configure(cell, occurrence: occurrence)
         return cell
-    }
-    public func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-        let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "month", for: indexPath) as! CalendarMonthHeader
-        if let day = try? engine.page(at: indexPath.section, scope: .month).anchor,
-           let date = try? day.date(in: configuration.timeZone) { header.label.text = monthFormatter.string(from: date) }
-        header.label.font = resolvedAppearance.headerFont; header.label.textColor = appearance.headerColor
-        header.backgroundColor = appearance.backgroundColor
-        return header
     }
     public func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
         transition == nil && configuration.selectionMode != .disabled && (grid(in: indexPath.section)?.occurrences[indexPath.item].isSelectable ?? false)
