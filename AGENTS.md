@@ -37,5 +37,6 @@ Use XCTest with `*Tests.swift` files and descriptive `test...` methods. Add regr
 Recent commits use imperative, sentence-case subjects such as “Add shared selection contracts”; follow that pattern. Keep commits focused. PRs should describe the behavior change, link relevant issues, list validation commands and results, and include screenshots for visible UI changes. Preserve unrelated working-tree edits and exclude generated artifacts.
 Make sure no uncommited changes before editing.
 Commit changes automatically after editing.
+Always commit changes to the `main` branch unless the user explicitly requests another branch.
 
 ## Specific
