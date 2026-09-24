@@ -79,6 +79,7 @@ final class MacUITests: XCTestCase {
     @MainActor func testConnectedRangeBandsAndExtension() {
         let app = XCUIApplication(); app.launchArguments = ["--scenario", "connectedRange"]; app.launch()
         let readout = app.textFields["state.readout"]
+        XCTAssertFalse(app.buttons["scope.handle"].isHittable)
         func click(_ date: String) {
             let day = app.buttons["day.\(date).1.2024-02-01"]
             XCTAssertTrue(day.waitForExistence(timeout: 5))
@@ -96,9 +97,26 @@ final class MacUITests: XCTestCase {
         click("2024-02-19")
         XCTAssertEqual(readout.value as? String, beforeInsideTap)
         let image = XCTAttachment(screenshot: app.screenshot())
-        image.name = "appkit-connected-range"
+        image.name = "appkit-connected-range-continuous"
         image.lifetime = .keepAlways
         add(image)
+        app.scrollViews["calendar.scroll"].scroll(byDeltaX: 0, deltaY: -400)
+        waitFor("2024-03-01")
+        XCTAssertTrue((readout.value as? String ?? "").contains("• month"))
+        XCTAssertTrue((readout.value as? String ?? "").contains("2024-02-21"))
+        app.buttons["scope.toggle"].click()
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "• week"), evaluatedWith: readout)
+        waitForExpectations(timeout: 5)
+        app.scrollViews["calendar.scroll"].scroll(byDeltaX: 0, deltaY: -150)
+        XCTAssertTrue((readout.value as? String ?? "").contains("• week"))
+        app.buttons["scope.toggle"].click()
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "• month"), evaluatedWith: readout)
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue((readout.value as? String ?? "").contains("2024-02-21"))
+        let roundTrip = XCTAttachment(screenshot: app.screenshot())
+        roundTrip.name = "appkit-connected-range-scope-round-trip"
+        roundTrip.lifetime = .keepAlways
+        add(roundTrip)
     }
     @MainActor func testLaunchMeasurement() {
         let app = XCUIApplication()

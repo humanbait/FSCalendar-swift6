@@ -21,7 +21,7 @@ import FSCalendarCore
     }
     private var initialMode: CalendarDisplayMode {
         switch scenario {
-        case .continuous: .continuousMonths
+        case .continuous, .connectedRange: .continuousMonths
         case .week: .week
         case .vertical: .month(.vertical)
         default: .month(.horizontal)
@@ -66,7 +66,8 @@ import FSCalendarCore
     func deselect(_ date: Date) { perform { try calendar.deselect(CivilDay(date: date, timeZone: DemoFixtures.calendar.timeZone)) } }
     func toggleScope() {
         guard scenario != .continuous else { return }
-        perform { try calendar.setDisplayMode(calendar.displayMode == .week ? .month(.horizontal) : .week) }
+        let monthMode: CalendarDisplayMode = scenario == .connectedRange ? .continuousMonths : .month(.horizontal)
+        perform { try calendar.setDisplayMode(calendar.displayMode == .week ? monthMode : .week) }
     }
     func handleScopeGesture(_ gesture: NSPanGestureRecognizer) { calendar.handleScopeGesture(gesture) }
     func reloadContent() { calendar.reloadData(); onChange?() }

@@ -4,6 +4,11 @@ public enum DemoScenario: String, CaseIterable {
     case month, vertical, week, continuous, multiple, swipe, hidden, variable, sixRows
     case bounds, content, custom, range, connectedRange, scope, dynamicHeight, rtl, largeText, dark
 
+    public static var groups: [(title: String, scenarios: [DemoScenario])] {
+        [("Examples", allCases.filter { $0 != .connectedRange }),
+         ("Combined usage", [.connectedRange])]
+    }
+
     public var title: String {
         switch self {
         case .month: "Month paging"

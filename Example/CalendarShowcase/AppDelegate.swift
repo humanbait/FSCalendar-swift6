@@ -35,10 +35,16 @@ final class ScenarioListController: UITableViewController {
         tableView.accessibilityIdentifier = "scenarios"
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "scenario")
     }
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { DemoScenario.allCases.count }
+    override func numberOfSections(in tableView: UITableView) -> Int { DemoScenario.groups.count }
+    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        DemoScenario.groups[section].title
+    }
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        DemoScenario.groups[section].scenarios.count
+    }
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "scenario", for: indexPath)
-        let scenario = DemoScenario.allCases[indexPath.row]
+        let scenario = DemoScenario.groups[indexPath.section].scenarios[indexPath.row]
         var content = cell.defaultContentConfiguration()
         content.text = scenario.title
         content.image = UIImage(systemName: "calendar")
@@ -48,7 +54,8 @@ final class ScenarioListController: UITableViewController {
         return cell
     }
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        navigationController?.pushViewController(ScenarioController(scenario: DemoScenario.allCases[indexPath.row]), animated: true)
+        let scenario = DemoScenario.groups[indexPath.section].scenarios[indexPath.row]
+        navigationController?.pushViewController(ScenarioController(scenario: scenario), animated: true)
     }
 }
 

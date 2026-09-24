@@ -9,7 +9,6 @@ final class CalendarShowcaseUITests: XCTestCase {
         XCTContext.runActivity(named: "PagingAndSelectionPersistence") { _ in exercisePagingAndSelectionPersistence() }
         XCTContext.runActivity(named: "ScopeChangesAndRotation") { _ in exerciseScopeChangesAndRotation() }
         XCTContext.runActivity(named: "MultipleSelectionAndCustomCells") { _ in exerciseMultipleSelectionAndCustomCells() }
-        XCTContext.runActivity(named: "ConnectedRangeBands") { _ in exerciseConnectedRangeBands() }
         XCTContext.runActivity(named: "SwipeSelection") { _ in exerciseSwipeSelection() }
         XCTContext.runActivity(named: "ContinuousScroll") { _ in exerciseContinuousScroll() }
         XCTContext.runActivity(named: "VerticalPaging") { _ in exerciseVerticalPaging() }
@@ -42,6 +41,12 @@ final class CalendarShowcaseUITests: XCTestCase {
         screenshot.name = "\(implementation)-swipe-height-restored"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+
+    @MainActor func testConnectedRangeCombinedUsage() {
+        XCTContext.runActivity(named: "Connected range, continuous months, and button scope") { _ in
+            exerciseConnectedRangeBands()
+        }
     }
 
     @MainActor func testAnimationParity() {
@@ -148,6 +153,7 @@ final class CalendarShowcaseUITests: XCTestCase {
     @MainActor private func exerciseConnectedRangeBands() {
         let app = launch("connectedRange")
         let state = app.staticTexts["selection-state"]
+        let page = app.staticTexts["page-state"]
         day(app, "2024-02-16").tap()
         day(app, "2024-02-20").tap()
         wait(state, contains: "2024-02-18") // The selected band crosses the week boundary.
@@ -159,9 +165,24 @@ final class CalendarShowcaseUITests: XCTestCase {
         day(app, "2024-02-19").tap()
         XCTAssertEqual(state.label, beforeInsideTap)
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "\(implementation)-connected-range"
+        shot.name = "\(implementation)-connected-range-continuous"
         shot.lifetime = .keepAlways
         add(shot)
+        app.collectionViews["calendar-grid"].swipeUp()
+        wait(page, contains: "2024-03")
+        XCTAssertTrue(page.label.contains("month"))
+        XCTAssertTrue(state.label.contains("2024-02-21"))
+        app.buttons["scope"].tap()
+        wait(page, contains: "week")
+        app.collectionViews["calendar-grid"].swipeUp()
+        XCTAssertTrue(page.label.contains("week"), "Calendar pan must not switch scope")
+        app.buttons["scope"].tap()
+        wait(page, contains: "month")
+        XCTAssertTrue(state.label.contains("2024-02-21"))
+        let roundTrip = XCTAttachment(screenshot: app.screenshot())
+        roundTrip.name = "\(implementation)-connected-range-scope-round-trip"
+        roundTrip.lifetime = .keepAlways
+        add(roundTrip)
     }
     @MainActor private func exerciseContinuousScroll() {
         let app = launch("continuous")

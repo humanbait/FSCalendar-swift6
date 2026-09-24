@@ -20,7 +20,7 @@ final class SharedDriverTests: XCTestCase {
             window.rootViewController = originalRoot
             window.makeKeyAndVisible()
         }
-        for scenario in [DemoScenario.month, .week, .variable, .continuous] {
+        for scenario in [DemoScenario.month, .week, .variable, .continuous, .connectedRange] {
             let page = ScenarioController(scenario: scenario)
             let navigation = UINavigationController(rootViewController: page)
             navigation.loadViewIfNeeded()
@@ -29,7 +29,7 @@ final class SharedDriverTests: XCTestCase {
             page.view.layoutIfNeeded()
             let initialHeight = page.driver.view.bounds.height
             let calendar = (page.driver as! SwiftCalendarDriver).calendar
-            let expectedHeight: CGFloat = scenario == .continuous ? 400 : calendar.preferredHeight
+            let expectedHeight: CGFloat = [.continuous, .connectedRange].contains(scenario) ? 400 : calendar.preferredHeight
             XCTAssertEqual(initialHeight, expectedHeight, accuracy: 0.5, scenario.rawValue)
             func capture(_ stage: String) {
                 let image = UIGraphicsImageRenderer(bounds: navigation.view.bounds).image { context in
@@ -170,6 +170,48 @@ final class SharedDriverTests: XCTestCase {
         })
         XCTAssertFalse(old.dayState?.isSelected ?? true)
         XCTAssertLessThan(old.selectionBackground.frame.width, old.contentView.bounds.width)
+    }
+    @MainActor func testConnectedRangeUsesButtonOnlyScopeAndContinuousViewport() throws {
+        let list = ScenarioListController()
+        list.loadViewIfNeeded()
+        XCTAssertEqual(list.tableView.numberOfSections, 2)
+        XCTAssertEqual(list.tableView(list.tableView, titleForHeaderInSection: 1), "Combined usage")
+        XCTAssertEqual(list.tableView.numberOfRows(inSection: 1), 1)
+        XCTAssertEqual(list.tableView(list.tableView, cellForRowAt: IndexPath(row: 0, section: 1)).accessibilityIdentifier,
+                       "scenario.connectedRange")
+        let window = (UIApplication.shared.delegate as! AppDelegate).window!
+        let originalRoot = window.rootViewController
+        defer {
+            window.rootViewController = originalRoot
+            window.makeKeyAndVisible()
+        }
+        let page = ScenarioController(scenario: .connectedRange)
+        let navigation = UINavigationController(rootViewController: page)
+        window.rootViewController = navigation; window.makeKeyAndVisible()
+        page.view.layoutIfNeeded()
+        let driver = try XCTUnwrap(page.driver as? SwiftCalendarDriver)
+        XCTAssertEqual(driver.calendar.displayMode, .continuousMonths)
+        XCTAssertFalse(driver.calendar.scopeGestureEnabled)
+        XCTAssertEqual(driver.view.bounds.height, 400, accuracy: 0.5)
+        let selected = DemoFixtures.date("2024-02-14")
+        driver.select(selected)
+        func waitForMode(_ mode: CalendarDisplayMode) {
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                MainActor.assumeIsolated { driver.calendar.displayMode == mode }
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
+            page.view.layoutIfNeeded()
+        }
+        driver.toggleScope(); waitForMode(.week)
+        XCTAssertEqual(driver.view.bounds.height, driver.calendar.preferredHeight, accuracy: 0.5)
+        XCTAssertEqual(driver.state.selection, [selected])
+        driver.toggleScope(); waitForMode(.continuousMonths)
+        XCTAssertEqual(driver.view.bounds.height, 400, accuracy: 0.5)
+        XCTAssertEqual(driver.state.selection, [selected])
+        driver.reset()
+        XCTAssertEqual(driver.calendar.displayMode, .continuousMonths)
+        XCTAssertTrue(driver.state.selection.isEmpty)
+        XCTAssertEqual(driver.view.bounds.height, 400, accuracy: 0.5)
     }
     @MainActor func testSwiftRepeatedNavigationPerformance() {
         let driver = SwiftCalendarDriver(scenario: .month)

@@ -10,14 +10,14 @@ import FSCalendarCore
     var onHeightChange: ((CGFloat, Bool) -> Void)?
     private(set) var events: [String] = []
     var view: UIView { calendar }
-    var initialHeight: CGFloat { scenario == .continuous ? 400 : calendar.preferredHeight }
+    var initialHeight: CGFloat { [.continuous, .connectedRange].contains(scenario) ? 400 : calendar.preferredHeight }
     var state: DemoState {
         DemoState(page: (try? calendar.currentPage.date(in: DemoFixtures.calendar.timeZone)) ?? DemoFixtures.initialDate,
                   scope: calendar.displayMode.scope.rawValue, selection: calendar.selectedDates, events: events)
     }
     private var initialMode: CalendarDisplayMode {
         switch scenario {
-        case .continuous: .continuousMonths
+        case .continuous, .connectedRange: .continuousMonths
         case .week: .week
         case .vertical: .month(.vertical)
         default: .month(.horizontal)
@@ -36,7 +36,8 @@ import FSCalendarCore
         try! calendar.apply(configuration: configuration)
         calendar.delegate = self; calendar.dataSource = self
         calendar.accessibilityIdentifier = "calendar"
-        calendar.scopeGestureEnabled = scenario != .scope // The scope screen forwards its external container pan.
+        // Interactive scope forwards a container pan; connected range switches only through its button.
+        calendar.scopeGestureEnabled = ![.scope, .connectedRange].contains(scenario)
         calendar.swipeSelectionEnabled = [.swipe, .range].contains(scenario)
         if [.custom, .range].contains(scenario) { try! calendar.register(DemoSwiftCell.self, forCellReuseIdentifier: "custom") }
         if scenario == .connectedRange {
@@ -56,7 +57,8 @@ import FSCalendarCore
     func deselect(_ date: Date) { perform { try calendar.deselect(CivilDay(date: date, timeZone: DemoFixtures.calendar.timeZone)) } }
     func toggleScope() {
         guard scenario != .continuous else { return }
-        perform { try calendar.setDisplayMode(calendar.displayMode == .week ? .month(.horizontal) : .week) }
+        let monthMode: CalendarDisplayMode = scenario == .connectedRange ? .continuousMonths : .month(.horizontal)
+        perform { try calendar.setDisplayMode(calendar.displayMode == .week ? monthMode : .week) }
     }
     func handleScopeGesture(_ gesture: UIPanGestureRecognizer) { calendar.handleScopeGesture(gesture) }
     func reloadContent() { calendar.reloadData(); onChange?() }
@@ -119,9 +121,16 @@ import FSCalendarCore
         }
     }
     func calendarCurrentPageDidChange(_ calendar: FSCalendar) { append("page \(calendar.currentPage)") }
-    func calendar(_ calendar: FSCalendar, didChangeDisplayMode mode: CalendarDisplayMode) { append("mode \(mode.scope.rawValue)") }
+    func calendar(_ calendar: FSCalendar, didChangeDisplayMode mode: CalendarDisplayMode) {
+        if scenario == .connectedRange {
+            onHeightChange?(mode.isContinuous ? 400 : calendar.preferredHeight, false)
+        }
+        append("mode \(mode.scope.rawValue)")
+    }
     func calendar(_ calendar: FSCalendar, preferredHeightDidChange height: CGFloat, animated: Bool) {
-        if scenario != .continuous { onHeightChange?(height, animated) }
+        if scenario != .continuous {
+            onHeightChange?(scenario == .connectedRange && calendar.displayMode.isContinuous ? 400 : height, animated)
+        }
         onChange?()
     }
     private func append(_ event: String) {

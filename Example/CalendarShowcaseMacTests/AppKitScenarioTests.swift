@@ -84,4 +84,38 @@ final class AppKitScenarioTests: XCTestCase {
         XCTAssertFalse(old.dayState?.isSelected ?? true)
         XCTAssertLessThan(old.selectionBackground.frame.width, old.view.bounds.width)
     }
+    @MainActor func testConnectedRangeCombinedMenuAndContinuousScope() throws {
+        XCTAssertEqual(DemoScenario.groups.map(\.title), ["Examples", "Combined usage"])
+        XCTAssertEqual(DemoScenario.groups[1].scenarios, [.connectedRange])
+        let controller = ShowcaseController()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1080, height: 820),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentViewController = controller; window.orderFront(nil)
+        defer { window.close() }
+        controller.show(.connectedRange); controller.view.layoutSubtreeIfNeeded()
+        let driver = try XCTUnwrap(controller.driver)
+        XCTAssertEqual(controller.sidebarHeadings.map(\.stringValue), ["Examples", "Combined usage"])
+        XCTAssertEqual(controller.scenarios.selectedItem?.representedObject as? String, "connectedRange")
+        XCTAssertEqual(driver.calendar.displayMode, .continuousMonths)
+        XCTAssertEqual(driver.view.frame.height, 420, accuracy: 0.5)
+        let selected = DemoFixtures.date("2024-02-14")
+        driver.select(selected)
+        func waitForMode(_ mode: CalendarDisplayMode) {
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                MainActor.assumeIsolated { driver.calendar.displayMode == mode }
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
+            controller.view.layoutSubtreeIfNeeded()
+        }
+        driver.toggleScope(); waitForMode(.week)
+        XCTAssertEqual(driver.view.frame.height, driver.calendar.preferredHeight, accuracy: 0.5)
+        XCTAssertEqual(driver.state.selection, [selected])
+        driver.toggleScope(); waitForMode(.continuousMonths)
+        XCTAssertEqual(driver.view.frame.height, 420, accuracy: 0.5)
+        XCTAssertEqual(driver.state.selection, [selected])
+        driver.reset(); controller.view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(driver.calendar.displayMode, .continuousMonths)
+        XCTAssertTrue(driver.state.selection.isEmpty)
+        XCTAssertEqual(driver.view.frame.height, 420, accuracy: 0.5)
+    }
 }
