@@ -36,12 +36,15 @@ import FSCalendarCore
             minimumDate: CivilDay(date: minimum, timeZone: DemoFixtures.calendar.timeZone),
             maximumDate: CivilDay(date: maximum, timeZone: DemoFixtures.calendar.timeZone),
             timeZone: DemoFixtures.calendar.timeZone, locale: DemoFixtures.calendar.locale!,
-            selectionMode: [.multiple, .swipe, .range].contains(scenario) ? .multiple : .single)
+            selectionMode: [.multiple, .swipe, .range, .connectedRange].contains(scenario) ? .multiple : .single)
         try! calendar.apply(configuration: configuration)
         calendar.delegate = self; calendar.dataSource = self
         calendar.setAccessibilityIdentifier("calendar")
         calendar.swipeSelectionEnabled = [.swipe, .range].contains(scenario)
         if [.custom, .range].contains(scenario) { try! calendar.register(DemoAppKitItem.self, forItemReuseIdentifier: "custom") }
+        if scenario == .connectedRange {
+            try! calendar.register(ConnectedRangeAppKitItem.self, forItemReuseIdentifier: "connected")
+        }
         if scenario == .rtl { calendar.userInterfaceLayoutDirection = .rightToLeft }
         if scenario == .dark { calendar.appearance = NSAppearance(named: .darkAqua) }
         if scenario == .largeText {
@@ -84,10 +87,32 @@ import FSCalendarCore
         return DayAppearance()
     }
     func calendar(_ calendar: FSCalendarView, reuseIdentifierFor day: CivilDay) -> String? {
-        [.custom, .range].contains(scenario) ? "custom" : nil
+        if scenario == .connectedRange {
+            return "connected"
+        }
+        return [.custom, .range].contains(scenario) ? "custom" : nil
+    }
+    func calendar(_ calendar: FSCalendarView, shouldApply change: SelectionChange) -> Bool {
+        scenario != .connectedRange || change.origin != .user || change.removed.isEmpty
     }
     func calendar(_ calendar: FSCalendarView, didChangeSelection change: SelectionChange) {
         append("selection +\(change.added.map(\.description).joined(separator: ",")) -\(change.removed.map(\.description).joined(separator: ",")) [\(change.origin.rawValue)]")
+        if scenario == .connectedRange {
+            Task { @MainActor [weak self] in
+                guard let self, self.calendar.selectedDays == change.selection else { return }
+                if change.origin == .user, change.selection.count > 1,
+                   let first = change.selection.min(), let last = change.selection.max() {
+                    var days: [CivilDay] = [], cursor = first
+                    while cursor <= last {
+                        days.append(cursor)
+                        guard let next = try? cursor.addingDays(1) else { break }
+                        cursor = next
+                    }
+                    self.perform { try self.calendar.setSelection(days) }
+                }
+                self.calendar.reload(dates: Set(self.calendar.selectedDays))
+            }
+        }
         if scenario == .range, change.origin == .user, change.selection.count == 2,
            let first = change.selection.min(), let last = change.selection.max() {
             // Delegate callbacks cannot reenter a selection transaction. Apply the sample range on the next actor turn.
@@ -113,6 +138,48 @@ import FSCalendarCore
         events.append(event)
         if events.count > 40 { events.removeFirst(events.count - 40) }
         onChange?()
+    }
+}
+
+@MainActor class ConnectedRangeAppKitItem: FSCalendarItem {
+    override func apply(content: DayContent, state: DayState, appearance: FSCalendarAppearance, style: DayAppearance) {
+        super.apply(content: content, state: state, appearance: appearance, style: style)
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+    }
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
+                                        .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        guard let day = dayState?.occurrence.day, dayState?.isSelected == true else {
+            selectionBackground.layer?.maskedCorners = allCorners
+            return
+        }
+        var ancestor = view.superview
+        while ancestor != nil && !(ancestor is FSCalendarView) { ancestor = ancestor?.superview }
+        let calendar = ancestor as? FSCalendarView
+        let selected = Set(calendar?.selectedDays ?? [])
+        let previous = (try? day.addingDays(-1)).map(selected.contains) ?? false
+        let next = (try? day.addingDays(1)).map(selected.contains) ?? false
+        let role = ConnectedRangeBand.role(previousSelected: previous, nextSelected: next,
+                                           weekday: day.weekday, firstWeekday: calendar?.configuration.firstWeekday ?? 1)
+        let overlap = 1 / max(1, view.window?.backingScaleFactor ?? 1)
+        var frame = view.bounds.insetBy(dx: 0, dy: 3)
+        if role == .middle || role == .trailing { frame.origin.x -= overlap; frame.size.width += overlap }
+        if role == .middle || role == .leading { frame.size.width += overlap }
+        selectionBackground.frame = frame
+        selectionBackground.layer?.borderWidth = 0
+        selectionBackground.layer?.cornerRadius = selectionBackground.bounds.height / 2
+        selectionBackground.layer?.maskedCorners = switch role {
+        case .single: allCorners
+        case .leading: [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        case .middle: []
+        case .trailing: [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        }
+    }
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        selectionBackground.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
+                                                     .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
     }
 }
 

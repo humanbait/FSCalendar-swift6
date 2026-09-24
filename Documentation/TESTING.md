@@ -19,8 +19,8 @@ The runner stops only its own process after 180 seconds without output or 30 min
 - Core: leap years, seven first weekdays, month/week boundaries, row counts, DST, skipped civil days, inclusive bounds, date/index/page round trips, invalid/overflow inputs.
 - Selection: order, deduplication, atomic replacement, validation, no-op proposals, configuration pruning.
 - UIKit contracts: callbacks, veto/reentry, placeholder synchronization, cancellation/replacement/resize, intrinsic height, Dynamic Type, finite geometry, sticky headers/RTL, fractional-height continuous navigation, bounded cache over 120 months.
-- Demo: all 18 Swift scenarios, selection/reload persistence, custom title/subtitle/image/events after reuse.
-- UI: tap/reset, paging persistence, repeated scope changes/rotation, custom range cells, swipe selection, continuous scrolling, vertical paging, interactive scope round trip, bounds, five appearance screens, launch measurements, week navigation, dynamic row height, and an iOS 17 accessibility-description audit.
+- Demo: all 19 Swift scenarios, selection/reload persistence, custom title/subtitle/image/events after reuse.
+- UI: tap/reset, paging persistence, repeated scope changes/rotation, custom range cells, connected range bands and extension, swipe selection, continuous scrolling, vertical paging, interactive scope round trip, bounds, five appearance screens, launch measurements, week navigation, dynamic row height, and an iOS 17 accessibility-description audit.
 
 Queries use observable state, occurrence IDs including date and page, and predicate expectations. Rotation waits for controller transition completion. Gesture press durations model gestures; no fixed sleeps synchronize tests.
 
@@ -30,7 +30,7 @@ Performance tests collect five XCTest clock/memory samples for twelve month navi
 
 ## Reproducibility
 
-Launch arguments: `--scenario SCENARIO`. Names: `month`, `vertical`, `week`, `continuous`, `multiple`, `swipe`, `hidden`, `variable`, `sixRows`, `bounds`, `content`, `custom`, `range`, `scope`, `dynamicHeight`, `rtl`, `largeText`, `dark`.
+Launch arguments: `--scenario SCENARIO`. Names: `month`, `vertical`, `week`, `continuous`, `multiple`, `swipe`, `hidden`, `variable`, `sixRows`, `bounds`, `content`, `custom`, `range`, `connectedRange`, `scope`, `dynamicHeight`, `rtl`, `largeText`, `dark`. In `connectedRange`, tap two days to select an inclusive band; later taps outside extend it, while taps inside leave it unchanged.
 
 Fixtures: Gregorian, GMT, en_US_POSIX, initial/today 2024-02-14, bounds 2020-01-01...2030-12-31 (bounds scenario 2024-02-10...2024-03-20). Large Text uses a container content-size override. This does not change the phone's global text-size setting.
 
@@ -43,7 +43,7 @@ After adding files, regenerate the checked-in project with `python3 Scripts/gene
 ## Native macOS
 
 The independent `CalendarShowcaseMac` scheme and test plan run AppKit window-hosted tests,
-shared renderer contracts, all 18 scenario UI checks, desktop input and transition checks,
+shared renderer contracts, all 19 scenario UI checks, desktop input and transition checks,
 and Mac-specific clock, memory and launch measurements.
 
 ```sh

@@ -9,6 +9,7 @@ final class CalendarShowcaseUITests: XCTestCase {
         XCTContext.runActivity(named: "PagingAndSelectionPersistence") { _ in exercisePagingAndSelectionPersistence() }
         XCTContext.runActivity(named: "ScopeChangesAndRotation") { _ in exerciseScopeChangesAndRotation() }
         XCTContext.runActivity(named: "MultipleSelectionAndCustomCells") { _ in exerciseMultipleSelectionAndCustomCells() }
+        XCTContext.runActivity(named: "ConnectedRangeBands") { _ in exerciseConnectedRangeBands() }
         XCTContext.runActivity(named: "SwipeSelection") { _ in exerciseSwipeSelection() }
         XCTContext.runActivity(named: "ContinuousScroll") { _ in exerciseContinuousScroll() }
         XCTContext.runActivity(named: "VerticalPaging") { _ in exerciseVerticalPaging() }
@@ -143,6 +144,24 @@ final class CalendarShowcaseUITests: XCTestCase {
         let end = day(app, "2024-02-15")
         start.press(forDuration: 0.9, thenDragTo: end)
         wait(app.staticTexts["selection-state"], contains: "2024-02-15")
+    }
+    @MainActor private func exerciseConnectedRangeBands() {
+        let app = launch("connectedRange")
+        let state = app.staticTexts["selection-state"]
+        day(app, "2024-02-16").tap()
+        day(app, "2024-02-20").tap()
+        wait(state, contains: "2024-02-18") // The selected band crosses the week boundary.
+        day(app, "2024-02-14").tap()
+        wait(state, contains: "2024-02-15")
+        day(app, "2024-02-22").tap()
+        wait(state, contains: "2024-02-21")
+        let beforeInsideTap = state.label
+        day(app, "2024-02-19").tap()
+        XCTAssertEqual(state.label, beforeInsideTap)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "\(implementation)-connected-range"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
     @MainActor private func exerciseContinuousScroll() {
         let app = launch("continuous")

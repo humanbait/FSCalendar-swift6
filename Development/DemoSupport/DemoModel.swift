@@ -2,7 +2,7 @@ import Foundation
 
 public enum DemoScenario: String, CaseIterable {
     case month, vertical, week, continuous, multiple, swipe, hidden, variable, sixRows
-    case bounds, content, custom, range, scope, dynamicHeight, rtl, largeText, dark
+    case bounds, content, custom, range, connectedRange, scope, dynamicHeight, rtl, largeText, dark
 
     public var title: String {
         switch self {
@@ -19,11 +19,26 @@ public enum DemoScenario: String, CaseIterable {
         case .content: "Lunar subtitles & events"
         case .custom: "Custom cells"
         case .range: "Range picker"
+        case .connectedRange: "Connected range"
         case .scope: "Interactive month / week"
         case .dynamicHeight: "Dynamic height"
         case .rtl: "Right-to-left layout"
         case .largeText: "Large text"
         case .dark: "Dark appearance"
+        }
+    }
+}
+
+public enum ConnectedRangeBand: String {
+    case single, leading, middle, trailing
+
+    public static func role(previousSelected: Bool, nextSelected: Bool, weekday: Int, firstWeekday: Int) -> Self {
+        let column = (weekday - firstWeekday + 7) % 7
+        return switch (previousSelected && column > 0, nextSelected && column < 6) {
+        case (false, false): .single
+        case (false, true): .leading
+        case (true, true): .middle
+        case (true, false): .trailing
         }
     }
 }
@@ -77,4 +92,3 @@ public protocol CalendarDemoDriver: AnyObject {
     func toggleScope()
     func reloadContent()
 }
-

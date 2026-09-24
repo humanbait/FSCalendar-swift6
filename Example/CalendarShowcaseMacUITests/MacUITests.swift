@@ -23,7 +23,7 @@ final class MacUITests: XCTestCase {
     }
     @MainActor func testAllScenarioScreensAndReset() {
         let app = XCUIApplication(); app.launch()
-        let names = ["month", "vertical", "week", "continuous", "multiple", "swipe", "hidden", "variable", "sixRows", "bounds", "content", "custom", "range", "scope", "dynamicHeight", "rtl", "largeText", "dark"]
+        let names = ["month", "vertical", "week", "continuous", "multiple", "swipe", "hidden", "variable", "sixRows", "bounds", "content", "custom", "range", "connectedRange", "scope", "dynamicHeight", "rtl", "largeText", "dark"]
         for name in names {
             XCTContext.runActivity(named: "AppKit scenario: \(name)") { activity in
                 let button = app.buttons["scenario.\(name)"]
@@ -75,6 +75,30 @@ final class MacUITests: XCTestCase {
         XCTAssertTrue((state.value as? String ?? "").contains("• week"))
         app.buttons["reset"].click()
         expectation(for: NSPredicate(format: "value CONTAINS %@", "• month"), evaluatedWith: state); waitForExpectations(timeout: 5)
+    }
+    @MainActor func testConnectedRangeBandsAndExtension() {
+        let app = XCUIApplication(); app.launchArguments = ["--scenario", "connectedRange"]; app.launch()
+        let readout = app.textFields["state.readout"]
+        func click(_ date: String) {
+            let day = app.buttons["day.\(date).1.2024-02-01"]
+            XCTAssertTrue(day.waitForExistence(timeout: 5))
+            day.click()
+        }
+        func waitFor(_ date: String) {
+            expectation(for: NSPredicate(format: "value CONTAINS %@", date), evaluatedWith: readout)
+            waitForExpectations(timeout: 5)
+        }
+        click("2024-02-16"); click("2024-02-20")
+        waitFor("2024-02-18")
+        click("2024-02-14"); waitFor("2024-02-15")
+        click("2024-02-22"); waitFor("2024-02-21")
+        let beforeInsideTap = readout.value as? String
+        click("2024-02-19")
+        XCTAssertEqual(readout.value as? String, beforeInsideTap)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "appkit-connected-range"
+        image.lifetime = .keepAlways
+        add(image)
     }
     @MainActor func testLaunchMeasurement() {
         let app = XCUIApplication()

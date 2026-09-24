@@ -121,6 +121,56 @@ final class SharedDriverTests: XCTestCase {
         driver.reset()
         XCTAssertTrue(driver.state.selection.isEmpty)
     }
+    @MainActor func testConnectedRangeBandGeometryAndReuse() throws {
+        let driver = SwiftCalendarDriver(scenario: .connectedRange)
+        let window = host(driver); defer { window.isHidden = true }
+        let days = try (16...20).map { try CivilDay(date: DemoFixtures.date("2024-02-\($0)"), timeZone: DemoFixtures.calendar.timeZone) }
+        try driver.calendar.setSelection(days)
+        driver.calendar.reloadData(); driver.view.layoutIfNeeded()
+        func cells(in view: UIView) -> [FSCalendarCell] {
+            (view as? FSCalendarCell).map { [$0] } ?? view.subviews.flatMap(cells)
+        }
+        func band(_ number: Int) throws -> ConnectedRangeSwiftCell {
+            let expectedDay = days[number - 16]
+            return try XCTUnwrap(cells(in: driver.view).compactMap { $0 as? ConnectedRangeSwiftCell }.first {
+                $0.dayState?.occurrence.day == expectedDay && $0.dayState?.occurrence.position == .current
+            })
+        }
+        let friday = try band(16), saturday = try band(17), sunday = try band(18)
+        let monday = try band(19), tuesday = try band(20)
+        let left: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        let right: CACornerMask = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        XCTAssertEqual(friday.selectionBackground.layer.maskedCorners, left)
+        XCTAssertEqual(saturday.selectionBackground.layer.maskedCorners, right)
+        XCTAssertEqual(sunday.selectionBackground.layer.maskedCorners, left)
+        XCTAssertEqual(monday.selectionBackground.layer.maskedCorners, [])
+        XCTAssertEqual(tuesday.selectionBackground.layer.maskedCorners, right)
+        XCTAssertGreaterThan(friday.selectionBackground.frame.width, friday.contentView.bounds.width)
+        XCTAssertEqual(friday.frame.maxX, saturday.frame.minX, accuracy: 0.5)
+        XCTAssertGreaterThan(friday.selectionBackground.frame.maxX, friday.contentView.bounds.maxX)
+        XCTAssertLessThan(saturday.selectionBackground.frame.minX, saturday.contentView.bounds.minX)
+
+        try driver.calendar.setSelection([days[4]])
+        driver.calendar.reloadData(); driver.view.layoutIfNeeded()
+        let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
+                                        .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        let refreshed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated {
+                driver.view.layoutIfNeeded()
+                return cells(in: driver.view).compactMap { $0 as? ConnectedRangeSwiftCell }.first {
+                    $0.dayState?.occurrence.day == days[4] && $0.dayState?.occurrence.position == .current
+                }?.selectionBackground.layer.maskedCorners == allCorners
+            }
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [refreshed], timeout: 3), .completed)
+        let single = try band(20)
+        XCTAssertEqual(single.selectionBackground.layer.maskedCorners, allCorners)
+        let old = try XCTUnwrap(cells(in: driver.view).first {
+            $0.dayState?.occurrence.day == days[0] && $0.dayState?.occurrence.position == .current
+        })
+        XCTAssertFalse(old.dayState?.isSelected ?? true)
+        XCTAssertLessThan(old.selectionBackground.frame.width, old.contentView.bounds.width)
+    }
     @MainActor func testSwiftRepeatedNavigationPerformance() {
         let driver = SwiftCalendarDriver(scenario: .month)
         let window = host(driver); defer { window.isHidden = true }
