@@ -217,10 +217,6 @@ import FSCalendarCore
         }
         item.view.setAccessibilityEnabled(occurrence.isSelectable && configuration.selectionMode != .disabled)
         (item.view as? CalendarDayView)?.owner = self
-        item.view.layer?.borderWidth = focusedDay == occurrence.day && hasKeyboardFocus ? 2 : 0
-        item.view.layer?.borderColor = NSColor.keyboardFocusIndicatorColor.cgColor
-        item.view.layer?.cornerRadius = 4
-
     }
     func clamped(_ day: CivilDay) -> CivilDay { min(configuration.maximumDate, max(configuration.minimumDate, day)) }
     func rowCount(_ day: CivilDay, scope: CalendarScope, continuous: Bool = false) -> Int {

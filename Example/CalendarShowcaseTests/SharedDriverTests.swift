@@ -134,7 +134,14 @@ final class SharedDriverTests: XCTestCase {
             .continuousMonthGrid(containing: day).occurrences.first { $0.day == day })
         var appearance = FSCalendarAppearance()
         appearance.eventColor = .red; appearance.selectedTitleColor = .white
-        for size in [CGSize(width: 56, height: 44), CGSize(width: 70.3, height: 59.5)] {
+        for size in [CGSize(width: 56, height: 44), CGSize(width: 70.3, height: 59.5), CGSize(width: 117, height: 44)] {
+            let reference = FSCalendarCell(frame: .zero)
+            reference.frame = CGRect(origin: .zero, size: size)
+            reference.apply(content: DayContent(),
+                state: DayState(occurrence: occurrence, isSelected: false, isToday: true),
+                appearance: appearance, style: DayAppearance())
+            reference.setNeedsLayout(); reference.layoutIfNeeded()
+            let todayDiameter = reference.selectionBackground.frame.height
             for rtl in [false, true] {
                 cell.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
                 for selected in [false, true] {
@@ -151,6 +158,7 @@ final class SharedDriverTests: XCTestCase {
                             XCTAssertEqual(cell.titleLabel.frame.midX, size.width / 2, accuracy: 0.001)
                             XCTAssertEqual(cell.titleLabel.frame.midY, size.height / 2, accuracy: 0.001)
                             XCTAssertEqual(cell.selectionBackground.frame.midY, size.height / 2, accuracy: 0.001)
+                            XCTAssertEqual(cell.selectionBackground.frame.height, todayDiameter, accuracy: 0.001)
                             XCTAssertEqual(dot.frame.midX, size.width / 2, accuracy: 0.001)
                             XCTAssertEqual(dot.frame.minY - cell.titleLabel.frame.maxY, 3, accuracy: 0.001)
                             XCTAssertEqual(dot.frame.size, CGSize(width: 4, height: 4))

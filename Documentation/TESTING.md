@@ -156,3 +156,37 @@ native subviews or selective corner masks; the window-only
 bands. Evidence stays in ignored `artifacts/`. Exact Swift 6.2, iOS 16, macOS 13, and
 manual VoiceOver checks remain untested release gates. No new source files were added,
 so project regeneration was unnecessary.
+
+## Connected-range height and macOS focus outlines — 2026-09-29
+
+Connected bands now reuse the inherited today-circle diameter on both renderers,
+centered in the cell while retaining their horizontal joins and rounded ends.
+AppKit no longer draws a rectangular focus outline; focus tracking, accessibility,
+keyboard navigation and selection remain active.
+
+Validated with Xcode 27.1 / Swift 6.4, macOS 27.0 arm64, and iPhone 11 / iOS 17.7.2:
+
+| Check | Result | Local evidence under `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 40 passed | `range-height-final-20260929T081523Z/package.log` |
+| Full macOS validation runner | 36 passed; one scenario-reset assertion failed | `range-height-20260929T080811Z/` |
+| Isolated scenario-reset rerun, unchanged test | 1 passed | `range-height-reset-rerun-20260929T081300Z/` |
+| Final Mac example tests and light/dark connected-range UI tests | 7 passed | `range-height-final-20260929T081523Z/` |
+| Physical-iPhone example tests and connected-range UI test | 10 passed | `range-height-20260929T080826332741Z/` |
+
+Height assertions compare against the standard today circle at three cell sizes,
+including fractional and wide cells, selected/unselected states, event/no-event content,
+short month labels, RTL and repeated layout. Existing coverage verifies connected joins,
+February 29–March 1, targeted reloads, reuse and continuous/week round trips. AppKit tests
+assert zero cell border width after mouse-path activation and arrow navigation while
+accessibility focus and selection still update; the desktop UI suite also checks Space,
+Tab, dragging, scrolling and window resizing.
+
+The scenario-reset failure did not reproduce in isolation; no reset code or assertion
+was changed. The final UI captures use `FSCALENDAR_TEST_APPEARANCE` in the showcase
+process because the initial `AppleInterfaceStyle` launch preference did not actually
+change the appearance. Inspected native light/dark window captures show the today circle
+beside equal-height selected bands with no focus outline. iPhone light/dark captures also
+retain event dots and month separators. Evidence remains in ignored `artifacts/`.
+No source files were added, so project regeneration was unnecessary. Exact Swift 6.2,
+iOS 16, macOS 13 and manual VoiceOver remain untested release gates.

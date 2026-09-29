@@ -189,7 +189,9 @@ import FSCalendarCore
         let role = ConnectedRangeBand.role(previousSelected: previous, nextSelected: next,
                                            weekday: day.weekday, firstWeekday: calendar?.configuration.firstWeekday ?? 1)
         let overlap = 1 / max(1, view.window?.backingScaleFactor ?? 1)
-        var frame = view.bounds.insetBy(dx: 0, dy: 3)
+        // Keep the connected band as tall as the inherited today circle.
+        var frame = CGRect(x: bounds.minX, y: selectionBackground.frame.minY,
+                           width: bounds.width, height: selectionBackground.frame.height)
         if role == .middle || role == .trailing { frame.origin.x -= overlap; frame.size.width += overlap }
         if role == .middle || role == .leading { frame.size.width += overlap }
         selectionBackground.frame = frame

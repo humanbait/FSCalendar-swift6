@@ -77,7 +77,16 @@ final class MacUITests: XCTestCase {
         expectation(for: NSPredicate(format: "value CONTAINS %@", "• month"), evaluatedWith: state); waitForExpectations(timeout: 5)
     }
     @MainActor func testConnectedRangeBandsAndExtension() {
-        let app = XCUIApplication(); app.launchArguments = ["--scenario", "connectedRange"]; app.launch()
+        checkConnectedRangeBandsAndExtension(interfaceStyle: "Light")
+    }
+    @MainActor func testConnectedRangeBandsAndExtensionDark() {
+        checkConnectedRangeBandsAndExtension(interfaceStyle: "Dark")
+    }
+    @MainActor private func checkConnectedRangeBandsAndExtension(interfaceStyle: String) {
+        let app = XCUIApplication()
+        app.launchArguments = ["--scenario", "connectedRange"]
+        app.launchEnvironment["FSCALENDAR_TEST_APPEARANCE"] = interfaceStyle.lowercased()
+        app.launch()
         let readout = app.textFields["state.readout"]
         XCTAssertFalse(app.buttons["scope.handle"].isHittable)
         func click(_ date: String) {
@@ -92,6 +101,10 @@ final class MacUITests: XCTestCase {
         }
         click("2024-02-16"); click("2024-02-20")
         waitFor("2024-02-18")
+        let heightComparison = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        heightComparison.name = "appkit-connected-range-today-height-\(interfaceStyle.lowercased())"
+        heightComparison.lifetime = .keepAlways
+        add(heightComparison)
         click("2024-02-14"); waitFor("2024-02-15")
         click("2024-02-22"); waitFor("2024-02-21")
         let beforeInsideTap = readout.value as? String
@@ -107,7 +120,7 @@ final class MacUITests: XCTestCase {
         XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)
         XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 1)
         let image = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        image.name = "appkit-connected-range-continuous"
+        image.name = "appkit-connected-range-continuous-\(interfaceStyle.lowercased())"
         image.lifetime = .keepAlways
         add(image)
         let beforeScroll = readout.value as? String ?? ""
@@ -126,7 +139,7 @@ final class MacUITests: XCTestCase {
         waitForExpectations(timeout: 5)
         XCTAssertTrue((readout.value as? String ?? "").contains("2024-02-21"))
         let roundTrip = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        roundTrip.name = "appkit-connected-range-scope-round-trip"
+        roundTrip.name = "appkit-connected-range-scope-round-trip-\(interfaceStyle.lowercased())"
         roundTrip.lifetime = .keepAlways
         add(roundTrip)
     }

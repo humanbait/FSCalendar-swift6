@@ -17,6 +17,12 @@ import FSCalendarAppKit
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 let application = NSApplication.shared
+// Keep UI-test captures independent of the desktop's current appearance.
+switch ProcessInfo.processInfo.environment["FSCALENDAR_TEST_APPEARANCE"] {
+case "light": application.appearance = NSAppearance(named: .aqua)
+case "dark": application.appearance = NSAppearance(named: .darkAqua)
+default: break
+}
 let delegate = AppDelegate()
 application.setActivationPolicy(.regular)
 application.delegate = delegate

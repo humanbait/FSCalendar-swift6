@@ -75,7 +75,8 @@ at most once per gesture. Focus is independent: `focusedDay` is read-only and
 
 Arrow keys move focus by one day or week, with horizontal arrows respecting RTL. Space
 activates the focused day. Page Up/Down navigate pages. Tab and Shift-Tab leave the calendar
-normally. Set `userInterfaceLayoutDirection = .rightToLeft` for explicit RTL.
+normally. Focus remains exposed to accessibility, but cells do not draw a rectangular
+keyboard-focus outline. Set `userInterfaceLayoutDirection = .rightToLeft` for explicit RTL.
 
 Paged trackpad input accumulates and snaps once scrolling settles. Continuous months use
 native NSScrollView scrolling and shared boundary weeks with no repeated dates. Weekday
@@ -106,7 +107,7 @@ try calendar.register(RoundedItem.self, forItemReuseIdentifier: "rounded")
 ```
 
 Call `super.apply` and reset every custom field on reuse. Defaults reset title, subtitle,
-image, events, styling, accessibility and focus decoration. `DayState` identifies both the
+image, events, styling and accessibility. `DayState` identifies both the
 civil day and its page-specific occurrence. Reloading a date updates all visible occurrences.
 Lunar dates remain supplied subtitles. The range demo derives its range from multiple
 selection and applies it on the next main-actor turn, after the selection callback finishes.
