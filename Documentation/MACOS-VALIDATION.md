@@ -121,3 +121,51 @@ adaptation; custom client colors still require their own checks.
 
 Reproduce with `./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64'`.
 Use `./script/build_and_run.sh --verify` to build and leave the native demo open.
+
+
+## Continuous/week scope animation — 2026-09-29
+
+AppKit now keeps the focused week together across month sections on a reversible
+0.3-second ease-in-out timeline. The Mac connected-range container applies each
+transition height synchronously and restores its 420-point continuous viewport.
+Header/weekday placement, row and separator opacity, and short month titles use the
+same progress. Scope requests reverse in place; resize cancellation restores the
+original fractional scroll position. Selection, custom bands/dots, keyboard focus,
+and the absence of focus outlines remain covered by regression tests.
+
+Validated on Xcode 27.1 / Swift 6.4, macOS 27.0 (26A428), arm64:
+
+| Check | Result | Evidence under ignored `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 43 passed | `mac-scope-verified-20260929T090625Z/package.log` |
+| Full `test-macos.sh --destination 'platform=macOS,arch=arm64'` | 41 passed (34 hosted, 7 UI) | `mac-scope-verified-20260929T090625Z/` |
+| Final hosted frame/capture check with a centered test window | 1 passed; native intermediate capture unavailable | `mac-scope-captures-20260929T091150Z/` |
+
+The final focused run also repeated all 43 SwiftPM tests successfully. Only the test
+window's placement and documentation changed after the full pass; renderer and showcase
+sources are identical. An earlier regression run exposed fractional scrolling being
+lost during resize cancellation; that failure was fixed before the full passing run.
+
+The deterministic checks sample 0%, 25%, 50%, 75% and 100% in both directions,
+including February–March and December–January, RTL, fractional dimensions and
+scrolling. They inspect live cell frames and alpha values in addition to layout
+attributes, require an opaque boundary week, and allow one display pixel at grid
+handoffs. Separate tests run real animated collapse/expansion and rapid reversals,
+exercise Reduce Motion during settlement, targeted reloads and resize cleanup.
+The showcase test verifies that its readout and agenda track each intermediate height.
+
+Native intermediate captures through the hosted test's `screencapture` process were
+unavailable even after centering the test window on an attached display: it returned
+“could not create image from window”. The test retains that
+result as text attachments alongside the JSON geometry trace; these are not screenshot
+or visual-animation passes. Native UI window captures remain the visual reference for
+connected bands, since AppKit bitmap caching does not reproduce their corner masks.
+Inspected the full UI run’s light/dark continuous and scope-round-trip window captures:
+the connected February–March band, event dots, separators and 420-point viewport remain
+intact, with no rectangular focus outline. These endpoint captures do not substitute for
+a visual inspection of intermediate native frames.
+
+No source files were added, so Xcode project regeneration was unnecessary. UIKit and
+Core were unchanged. Exact Swift 6.2, macOS 13, and manual VoiceOver remain separate
+release checks; the automated Reduce Motion override does not establish a manual
+system-preference observation.

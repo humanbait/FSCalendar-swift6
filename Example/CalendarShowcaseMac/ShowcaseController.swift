@@ -88,7 +88,10 @@ import FSCalendarAppKit
         self.scenario = scenario; driver = AppKitCalendarDriver(scenario: scenario)
         content.addSubview(driver.view)
         driver.onChange = { [weak self] in self?.updateReadout() }
-        driver.onHeightChange = { [weak self] _, _ in self?.view.needsLayout = true }
+        driver.onHeightChange = { [weak self] _, _ in
+            guard let self else { return }
+            self.view.needsLayout = true; self.view.layoutSubtreeIfNeeded()
+        }
         if let index = scenarios.itemArray.firstIndex(where: { $0.representedObject as? String == scenario.rawValue }) {
             scenarios.selectItem(at: index)
         }
@@ -145,7 +148,7 @@ import FSCalendarAppKit
         sidebarContent.frame = NSRect(x: 0, y: 0, width: 204, height: sidebarY)
         contentScroll.frame = NSRect(x: 244, y: 60, width: max(350, width - 264), height: max(250, height - 80))
         let contentWidth = contentScroll.contentSize.width
-        let continuousViewport = scenario == .continuous || (scenario == .connectedRange && driver.calendar.displayMode.isContinuous)
+        let continuousViewport = scenario == .continuous || (scenario == .connectedRange && driver.calendar.displayMode.isContinuous && driver.calendar.transitionState == .idle)
         let calendarHeight = continuousViewport ? CGFloat(420) : driver.calendar.preferredHeight
         let total = calendarHeight + (scenario == .scope ? 350 : 160)
         content.frame = NSRect(x: 0, y: 0, width: contentWidth, height: max(contentScroll.contentSize.height, total))

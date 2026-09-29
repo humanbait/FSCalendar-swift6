@@ -14,6 +14,12 @@ import FSCalendarCore
     let renderGridHeight: CGFloat
     let sourceOffset: CGFloat
     let targetOffset: CGFloat
+    var isContinuousScope: Bool { sourceMode.scope != targetMode.scope && renderMode.isContinuous }
+    var focusedRow = 0
+    var continuousOffset = NSPoint.zero
+    var rowOffset: CGFloat = 0
+    var monthProgress: CGFloat { targetMode.isContinuous ? progress : 1 - progress }
+    var titleFades: [(day: CivilDay, label: NSTextField, outgoing: NSView)] = []
     var progress: CGFloat = 0
     var settlingCommit = true
     init(sourceMode: CalendarDisplayMode, sourcePage: CivilDay, plan: CalendarTransitionPlan,
@@ -31,6 +37,14 @@ import FSCalendarCore
 extension FSCalendarView {
     public func setDisplayMode(_ target: CalendarDisplayMode, animated: Bool = true) throws {
         guard !isMutating else { throw CalendarError.reentrantMutation }
+        if animated, !reduceMotion, let context = transition, context.isContinuousScope,
+           transitionPhase == .settling, target == context.sourceMode || target == context.targetMode {
+            let commit = target == context.targetMode
+            guard commit != context.settlingCommit else { return }
+            context.settlingCommit = commit
+            animationDriver.reverseScope(towardEnd: commit)
+            return
+        }
         cancelTransition()
         guard target != mode else { return }
         if !animated || reduceMotion {
@@ -51,36 +65,95 @@ extension FSCalendarView {
         guard !mode.isContinuous, !target.isContinuous, mode.scope != target.scope else { throw CalendarError.unsupportedDisplayMode }
         prepareTransition(to: target)
     }
-    private func prepareTransition(to target: CalendarDisplayMode) {
+    func prepareTransition(to target: CalendarDisplayMode) {
         layoutSubtreeIfNeeded()
         let plan = transitionPlan(to: target)
-        let changesScope = mode.scope != target.scope && !mode.isContinuous && !target.isContinuous
+        let changesScope = mode.scope != target.scope
         let renderMode: CalendarDisplayMode = changesScope ? (mode.scope == .month ? mode : target) : target
         let renderPage = engine.pageID(containing: plan.anchor, scope: renderMode.scope).anchor
         let grid = try? renderMode.isContinuous
             ? engine.continuousMonthGrid(containing: renderPage)
             : engine.grid(containing: renderPage, scope: renderMode.scope)
         let row = grid.flatMap { engine.index(of: plan.anchor, in: $0) }.map { $0 / 7 } ?? 0
+        let continuousScope = changesScope && renderMode.isContinuous
+        let sourceHeight = continuousScope && bounds.height > 0 ? bounds.height : height(for: page, mode: mode)
+        let targetHeight = continuousScope && target.isContinuous
+            ? (continuousViewportHeight ?? height(for: plan.destinationPage, mode: target))
+            : height(for: plan.destinationPage, mode: target)
+        var titles: [CivilDay: (String, NSView)] = [:]
+        if continuousScope {
+            for case let item as FSCalendarItem in collectionView.visibleItems() {
+                guard let day = item.dayState?.occurrence.day, day.day == 1,
+                      let bitmap = item.titleLabel.bitmapImageRepForCachingDisplay(in: item.titleLabel.bounds) else { continue }
+                item.titleLabel.cacheDisplay(in: item.titleLabel.bounds, to: bitmap)
+                let image = NSImage(size: item.titleLabel.bounds.size); image.addRepresentation(bitmap)
+                titles[day] = (item.titleLabel.stringValue, NSImageView(image: image))
+            }
+        }
         let context = CalendarTransition(sourceMode: mode, sourcePage: page, plan: plan,
-            sourceHeight: height(for: page, mode: mode), targetHeight: height(for: plan.destinationPage, mode: target),
-            renderMode: renderMode, renderPage: renderPage, renderGridHeight: CGFloat(grid?.rowCount ?? 6) * metrics.rowHeight,
+            sourceHeight: sourceHeight, targetHeight: targetHeight,
+            renderMode: renderMode, renderPage: renderPage,
+            renderGridHeight: continuousScope ? max(sourceHeight, targetHeight) - metrics.weekdayHeight : CGFloat(grid?.rowCount ?? 6) * metrics.rowHeight,
             rowOffset: changesScope ? CGFloat(row) * metrics.rowHeight : 0)
+        if continuousScope {
+            let sections = engine.continuousMonthSections()
+            if let section = try? engine.sectionIndex(for: plan.anchor, scope: .month),
+               let grid = try? engine.continuousMonthGrid(containing: plan.anchor), let item = engine.index(of: plan.anchor, in: grid),
+               let renderSection = try? engine.sectionIndex(for: renderPage, scope: .month) {
+                context.focusedRow = (sections[section].startSlot + item) / 7
+                context.continuousOffset = mode.isContinuous ? scrollView.contentView.bounds.origin
+                    : NSPoint(x: 0, y: CGFloat(sections[renderSection].firstRow) * metrics.rowHeight)
+                context.rowOffset = CGFloat(context.focusedRow) * metrics.rowHeight - context.continuousOffset.y
+            }
+        }
+        input.cancelScroll()
         transition = context; transitionPhase = .interactive
-        rebuild(); needsLayout = true; layoutSubtreeIfNeeded()
+        updateHeader()
+        if !continuousScope || !mode.isContinuous { rebuild(notify: false) }
+        updateTransitionProgress(0, notify: false)
+        if continuousScope {
+            for case let item as FSCalendarItem in collectionView.visibleItems() {
+                guard let occurrence = item.dayState?.occurrence,
+                      let (oldTitle, snapshot) = titles[occurrence.day] else { continue }
+                configure(item, occurrence: occurrence); item.view.layoutSubtreeIfNeeded()
+                guard oldTitle != item.titleLabel.stringValue else { continue }
+                snapshot.frame = item.titleLabel.frame; snapshot.setAccessibilityElement(false)
+                item.titleLabel.superview?.addSubview(snapshot)
+                item.titleLabel.alphaValue = 0
+                context.titleFades.append((occurrence.day, item.titleLabel, snapshot))
+            }
+        }
     }
     public func updateInteractiveTransition(progress: CGFloat) {
         guard transitionPhase == .interactive else { return }
         updateTransitionProgress(progress)
     }
-    private func updateTransitionProgress(_ progress: CGFloat) {
+    private func updateTransitionProgress(_ progress: CGFloat, notify: Bool = true) {
         guard let context = transition else { return }
         context.progress = min(1, max(0, progress.isFinite ? progress : 0))
-        notifyHeight(animated: false); needsPagePosition = true; needsLayout = true; layoutSubtreeIfNeeded()
+        if context.isContinuousScope {
+            calendarLayout.focusedContinuousRow = context.focusedRow
+            calendarLayout.continuousMonthOpacity = context.monthProgress
+            calendarLayout.invalidateLayout()
+            for fade in context.titleFades { fade.label.alphaValue = context.progress; fade.outgoing.alphaValue = 1 - context.progress }
+        }
+        if notify { notifyHeight(animated: false) }
+        needsPagePosition = true; needsLayout = true; layoutSubtreeIfNeeded()
     }
     public func finishInteractiveTransition(commit: Bool, animated: Bool = true) {
         guard let context = transition else { return }
         animationDriver.cancel(); context.settlingCommit = commit; transitionPhase = .settling
         guard animated, !reduceMotion else { completeTransition(context, commit: commit); return }
+        if context.isContinuousScope, commit, context.progress == 0 {
+            animationDriver.animateScope(update: { [weak self, weak context] progress in
+                guard let self, let context, self.transition === context else { return }
+                self.updateTransitionProgress(progress)
+            }, completion: { [weak self, weak context] commit in
+                guard let self, let context, self.transition === context else { return }
+                self.completeTransition(context, commit: commit)
+            })
+            return
+        }
         animationDriver.animate(from: context.progress, to: commit ? 1 : 0, update: { [weak self, weak context] progress in
             guard let self, let context, self.transition === context else { return }
             self.updateTransitionProgress(progress)
@@ -96,11 +169,20 @@ extension FSCalendarView {
     private func completeTransition(_ context: CalendarTransition, commit: Bool) {
         guard transition === context else { return }
         let previous = page
+        if context.isContinuousScope, context.progress != (commit ? 1 : 0) { updateTransitionProgress(commit ? 1 : 0) }
         transition = nil; transitionPhase = .idle
+        for fade in context.titleFades { fade.label.alphaValue = 1; fade.outgoing.removeFromSuperview() }
+        calendarLayout.focusedContinuousRow = nil; calendarLayout.continuousMonthOpacity = 1
+        titleLabel.alphaValue = 1
         mode = commit ? context.targetMode : context.sourceMode
         page = commit ? context.targetPage : context.sourcePage
         if case .month(let axis) = mode { lastMonthAxis = axis }
-        reconcileFocus(); rebuild(); needsLayout = true; layoutSubtreeIfNeeded()
+        reconcileFocus(); rebuild(notify: !context.isContinuousScope); needsLayout = true; layoutSubtreeIfNeeded()
+        if context.isContinuousScope && mode.isContinuous && !commit {
+            scrollView.contentView.scroll(to: context.continuousOffset)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+            needsPagePosition = false
+        }
         if commit {
             delegate?.calendar(self, didChangeDisplayMode: mode)
             if page != previous { delegate?.calendarCurrentPageDidChange(self) }

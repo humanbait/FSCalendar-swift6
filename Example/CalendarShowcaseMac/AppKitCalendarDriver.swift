@@ -13,6 +13,7 @@ import FSCalendarCore
     let scenario: DemoScenario
     var onChange: (() -> Void)?
     var onHeightChange: ((CGFloat, Bool) -> Void)?
+    private var requestedMode: CalendarDisplayMode?
     private(set) var events: [String] = []
     var view: NSView { calendar }
     var state: DemoState {
@@ -56,6 +57,7 @@ import FSCalendarCore
         reset()
     }
     func reset() {
+        requestedMode = nil
         perform { try calendar.clearSelection(); try calendar.setDisplayMode(initialMode, animated: false)
             try calendar.setCurrentPage(DemoFixtures.initialDate, animated: false) }
         calendar.today = try? CivilDay(date: DemoFixtures.initialDate, timeZone: DemoFixtures.calendar.timeZone)
@@ -67,7 +69,10 @@ import FSCalendarCore
     func toggleScope() {
         guard scenario != .continuous else { return }
         let monthMode: CalendarDisplayMode = scenario == .connectedRange ? .continuousMonths : .month(.horizontal)
-        perform { try calendar.setDisplayMode(calendar.displayMode == .week ? monthMode : .week) }
+        let current = calendar.transitionState == .idle ? calendar.displayMode : (requestedMode ?? calendar.displayMode)
+        let target: CalendarDisplayMode = current == .week ? monthMode : .week
+        requestedMode = target
+        perform { try calendar.setDisplayMode(target) }
     }
     func handleScopeGesture(_ gesture: NSPanGestureRecognizer) { calendar.handleScopeGesture(gesture) }
     func reloadContent() { calendar.reloadData(); onChange?() }

@@ -21,6 +21,7 @@ import FSCalendarCore
         if let context = transition { return context.sourceHeight + (context.targetHeight - context.sourceHeight) * context.progress }
         return height(for: page, mode: mode)
     }
+    var continuousViewportHeight: CGFloat?
     var transition: CalendarTransition?
     var transitionPhase: CalendarTransitionState = .idle
     var renderingMode: CalendarDisplayMode { transition?.renderMode ?? mode }
@@ -71,6 +72,7 @@ import FSCalendarCore
         scrollView.documentView = collectionView
         scrollView.drawsBackground = false; scrollView.borderType = .noBorder
         addSubview(scrollView); addSubview(titleLabel)
+        titleLabel.wantsLayer = true; titleLabel.layer?.masksToBounds = true
         titleLabel.alignment = .center; titleLabel.setAccessibilityIdentifier("calendar.heading")
         for label in weekdayLabels { label.alignment = .center; addSubview(label) }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(accessibilityDisplayChanged), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
@@ -205,7 +207,15 @@ import FSCalendarCore
     }
     func configure(_ item: FSCalendarItem, occurrence: DayOccurrence) {
         var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
-        if renderingMode.isContinuous, occurrence.day.day == 1, content.title == nil {
+        if let context = transition {
+            // A scrolled-out title may be recycled while its surrounding row fades.
+            context.titleFades.removeAll { fade in
+                guard fade.label === item.titleLabel, fade.day != occurrence.day else { return false }
+                fade.label.alphaValue = 1; fade.outgoing.removeFromSuperview(); return true
+            }
+        }
+        let titleMode = transition.flatMap { $0.isContinuousScope ? $0.targetMode : nil } ?? renderingMode
+        if titleMode.isContinuous, occurrence.day.day == 1, content.title == nil {
             content.title = shortMonthSymbols[occurrence.day.month - 1]
         }
         if content.accessibilityLabel == nil {
@@ -225,14 +235,15 @@ import FSCalendarCore
         return ((day.startOfMonth.weekday - configuration.firstWeekday + 7) % 7 + day.daysInMonth + 6) / 7
     }
     func height(for day: CivilDay, mode: CalendarDisplayMode) -> CGFloat { (mode.isContinuous ? 0 : metrics.headerHeight) + metrics.weekdayHeight + CGFloat(rowCount(day, scope: mode.scope, continuous: mode.isContinuous)) * metrics.rowHeight }
-    func rebuild() {
+    func rebuild(notify: Bool = true) {
         input.cancelScroll()
         shortMonthSymbols = formatter("LLL").shortStandaloneMonthSymbols
         calendarLayout.monthSeparatorColor = metrics.monthSeparatorColor
         calendarLayout.mode = renderingMode; calendarLayout.rowHeight = metrics.rowHeight
         calendarLayout.continuousSections = renderingMode.isContinuous ? engine.continuousMonthSections() : []
         calendarLayout.rows = (0..<engine.pageCount(scope: renderingMode.scope)).compactMap { try? engine.page(at: $0, scope: renderingMode.scope) }.map { rowCount($0.anchor, scope: renderingMode.scope, continuous: renderingMode.isContinuous) }
-        calendarLayout.invalidateLayout(); reloadData(); updateHeader(); notifyHeight(animated: false)
+        calendarLayout.invalidateLayout(); reloadData(); updateHeader()
+        if notify { notifyHeight(animated: false) } else { invalidateIntrinsicContentSize() }
         needsPagePosition = true; needsLayout = true
     }
     func notifyHeight(animated: Bool) {
@@ -244,7 +255,11 @@ import FSCalendarCore
     }
     func updateHeader() {
         let appearance = metrics
-        titleLabel.stringValue = (try? page.date(in: configuration.timeZone)).map { formatter("LLLL yyyy").string(from: $0) } ?? page.description
+        let headingPage: CivilDay
+        if let context = transition, context.isContinuousScope {
+            headingPage = context.targetMode == .week ? context.targetPage : context.sourcePage
+        } else { headingPage = page }
+        titleLabel.stringValue = (try? headingPage.date(in: configuration.timeZone)).map { formatter("LLLL yyyy").string(from: $0) } ?? headingPage.description
         titleLabel.font = appearance.headerFont; titleLabel.textColor = appearance.headerColor
         let symbols = formatter("EEE").shortWeekdaySymbols!, full = formatter("EEEE").weekdaySymbols!
         for (column, label) in weekdayLabels.enumerated() {
@@ -271,11 +286,19 @@ import FSCalendarCore
     public override func layout() {
         super.layout()
         guard !isLayingOut else { return }; isLayingOut = true; defer { isLayingOut = false }
-        if transition != nil, lastSize != .zero,
-           abs(bounds.width - lastSize.width) > 0.5 || (abs(bounds.height - lastSize.height) > 0.5 && abs(bounds.height - preferredHeight) > 1) { cancelTransition() }
+        var restoredOffset: NSPoint?
+        if let context = transition, lastSize != .zero,
+           abs(bounds.width - lastSize.width) > 0.5 || (abs(bounds.height - lastSize.height) > 0.5 && abs(bounds.height - preferredHeight) > 1) {
+            if context.isContinuousScope, context.sourceMode.isContinuous { restoredOffset = context.continuousOffset }
+            cancelTransition()
+        }
         let appearance = metrics
-        let headerHeight = renderingMode.isContinuous ? 0 : appearance.headerHeight
-        titleLabel.isHidden = renderingMode.isContinuous
+        if transition == nil, mode.isContinuous, bounds.height > 0 { continuousViewportHeight = bounds.height }
+        let continuousTransition = transition.flatMap { $0.isContinuousScope ? $0 : nil }
+        let headerProgress = continuousTransition.map { 1 - $0.monthProgress } ?? (renderingMode.isContinuous ? 0 : 1)
+        let headerHeight = appearance.headerHeight * headerProgress
+        titleLabel.isHidden = continuousTransition == nil && renderingMode.isContinuous
+        titleLabel.alphaValue = headerProgress
         titleLabel.frame = NSRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         for (index, label) in weekdayLabels.enumerated() {
             label.frame = NSRect(x: CGFloat(index) * bounds.width / 7, y: headerHeight, width: bounds.width / 7, height: appearance.weekdayHeight)
@@ -295,10 +318,18 @@ import FSCalendarCore
         if needsPagePosition || lastSize != bounds.size {
             if let section = try? engine.sectionIndex(for: renderingPage, scope: renderingMode.scope) {
                 var offset = calendarLayout.offset(for: section)
-                if let context = transition { offset.y += context.sourceOffset + (context.targetOffset - context.sourceOffset) * context.progress }
+                if let restoredOffset {
+                    offset = restoredOffset
+                } else if let context = continuousTransition {
+                    offset = context.continuousOffset
+                    offset.y += context.rowOffset * (1 - context.monthProgress)
+                } else if let context = transition {
+                    offset.y += context.sourceOffset + (context.targetOffset - context.sourceOffset) * context.progress
+                }
                 scrollView.contentView.scroll(to: offset); scrollView.reflectScrolledClipView(scrollView.contentView)
             }
             needsPagePosition = false
+            collectionView.layoutSubtreeIfNeeded()
         }
         if lastSize != bounds.size { updateHeader() }
         lastSize = bounds.size

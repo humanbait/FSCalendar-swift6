@@ -224,3 +224,16 @@ also exercises ordinary button-driven scope round trips. No source files were ad
 so project regeneration was unnecessary. macOS UI validation was not repeated because
 its renderer and demo were unchanged. Exact Swift 6.2, iOS 16 and manual VoiceOver
 remain untested release gates; evidence stays under ignored `artifacts/`.
+
+
+## Smooth AppKit continuous/week scope animation — 2026-09-29
+
+AppKit now coordinates focused-week movement, viewport height, heading/weekday layout,
+row and separator fades, and short month titles on one reversible 0.3-second timeline.
+The connected-range showcase returns to 420 points and positions its readout and agenda
+from every intermediate height. Repeated destinations are ignored, opposite requests
+reverse in place, and resize cancellation restores fractional scrolling.
+
+See [Mac validation](MACOS-VALIDATION.md#continuousweek-scope-animation--2026-09-29)
+for the quarter-step geometry checks, real animation/reversal coverage, native capture
+evidence and platform limitations. Existing paged transitions remain covered.

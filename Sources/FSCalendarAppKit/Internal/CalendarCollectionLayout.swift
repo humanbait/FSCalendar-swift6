@@ -10,6 +10,8 @@ import FSCalendarCore
     var continuousSections: [ContinuousMonthSection] = [] { didSet { invalidateGeometry() } }
     var isRTL = false { didSet { if oldValue != isRTL { invalidateGeometry() } } }
     var monthSeparatorColor: NSColor = .separatorColor { didSet { invalidateLayout() } }
+    var focusedContinuousRow: Int?
+    var continuousMonthOpacity: CGFloat = 1
     private var frames: [CGRect] = []
     private var size: CGSize = .zero
     private var preparedSize: CGSize = .zero
@@ -122,6 +124,9 @@ import FSCalendarCore
         let slot = mode.isContinuous ? continuousSections[indexPath.section].startSlot + indexPath.item : indexPath.item
         let column = isRTL ? 6 - slot % 7 : slot % 7
         let attribute = NSCollectionViewLayoutAttributes(forItemWith: indexPath)
+        if mode.isContinuous, let focusedContinuousRow {
+            attribute.alpha = slot / 7 == focusedContinuousRow ? 1 : continuousMonthOpacity
+        }
         attribute.frame = CGRect(x: page.minX + CGFloat(column) * width,
                                  y: (mode.isContinuous ? 0 : page.minY) + CGFloat(slot / 7) * height,
                                  width: width, height: height)
@@ -156,6 +161,7 @@ import FSCalendarCore
                 }
             }
         }
+        attributes.alpha = continuousMonthOpacity
         attributes.color = monthSeparatorColor
         attributes.zIndex = 10
         return attributes

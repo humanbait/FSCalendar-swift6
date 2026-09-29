@@ -1,11 +1,86 @@
 import AppKit
 import XCTest
 import FSCalendarCore
-import FSCalendarAppKit
+@testable import FSCalendarAppKit
 import CalendarDemoSupportMac
 @testable import CalendarShowcaseMac
 
 final class AppKitScenarioTests: XCTestCase {
+    @MainActor func testConnectedScopeContainerFramesAndNativeCaptures() async throws {
+        let controller = ShowcaseController(); _ = controller.view; controller.show(.connectedRange)
+        let window = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 1080, height: 820),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentViewController = controller
+        window.center(); window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        controller.view.layoutSubtreeIfNeeded()
+        let calendar = controller.driver.calendar
+        let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+        try calendar.setSelection(boundary)
+        try calendar.setCurrentPage(boundary[0]); calendar.layoutSubtreeIfNeeded()
+        let pixel = 1 / window.backingScaleFactor
+        var trace: [[String: Any]] = []
+        for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+            window.appearance = NSAppearance(named: appearance)
+            for target: CalendarDisplayMode in [.week, .continuousMonths] {
+                calendar.prepareTransition(to: target)
+                let context = try XCTUnwrap(calendar.transition)
+                XCTAssertEqual(context.targetHeight, target.isContinuous ? 420 : calendar.height(for: boundary[1], mode: .week))
+                for progress: CGFloat in [0, 0.25, 0.5, 0.75, 1] {
+                    calendar.updateInteractiveTransition(progress: progress)
+                    XCTAssertEqual(calendar.frame.height, calendar.preferredHeight, accuracy: pixel)
+                    XCTAssertEqual(controller.readout.frame.minY, calendar.frame.maxY + 12, accuracy: pixel)
+                    XCTAssertEqual(controller.eventsScroll.frame.minY, calendar.frame.maxY + 44, accuracy: pixel)
+                    XCTAssertEqual(controller.agenda.frame.minY, calendar.frame.maxY + 184, accuracy: pixel)
+                    XCTAssertEqual(calendar.titleLabel.frame.maxY, calendar.weekdayLabels[0].frame.minY, accuracy: pixel)
+                    let cells = calendar.collectionView.visibleItems().compactMap { $0 as? ConnectedRangeAppKitItem }
+                    for day in boundary {
+                        let cell = try XCTUnwrap(cells.first { $0.dayState?.occurrence.day == day })
+                        XCTAssertEqual(cell.view.alphaValue, 1)
+                        XCTAssertTrue(cell.dayState?.isSelected == true)
+                        XCTAssertFalse(try XCTUnwrap(cell.view.layer?.sublayers?.first { $0.name == "connectedRange.event" }).isHidden)
+                        XCTAssertTrue(((cell.view.accessibilityValue() as? String) ?? "").contains("Has events"))
+                        XCTAssertEqual(cell.view.layer?.borderWidth, 0)
+                    }
+                    window.displayIfNeeded(); CATransaction.flush()
+                    trace.append(["appearance": name, "target": target.isContinuous ? "continuous" : "week",
+                                  "progress": Double(progress), "height": Double(calendar.frame.height),
+                                  "headerHeight": Double(calendar.titleLabel.frame.height),
+                                  "scrollOffset": Double(calendar.scrollView.contentView.bounds.minY)])
+                    // Capture the WindowServer composite: cacheDisplay omits selective band corner masks.
+                    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+                    let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                    process.arguments = ["-x", "-o", "-l", String(window.windowNumber), url.path]
+                    let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+                        process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+                        do { try process.run() } catch { continuation.resume(throwing: error) }
+                    }
+                    let attachment: XCTAttachment
+                    if status == 0, let image = NSImage(contentsOf: url) { attachment = XCTAttachment(image: image) }
+                    else { attachment = XCTAttachment(string: "Native window capture unavailable (status \(status)); check Screen Recording permission.") }
+                    attachment.name = "appkit-scope-\(name)-\(target.isContinuous ? "expand" : "collapse")-\(Int(progress * 100))"
+                    attachment.lifetime = .keepAlways; add(attachment)
+                    try? FileManager.default.removeItem(at: url)
+                }
+                let height = calendar.frame.height
+                calendar.finishInteractiveTransition(commit: true, animated: false)
+                XCTAssertEqual(calendar.frame.height, height, accuracy: pixel)
+                XCTAssertEqual(controller.readout.frame.minY, height + 12, accuracy: pixel)
+                XCTAssertNil(calendar.transition)
+            }
+        }
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]), uniformTypeIdentifier: "public.json")
+        attachment.name = "appkit-scope-frame-trace"; attachment.lifetime = .keepAlways; add(attachment)
+        calendar.reduceMotionOverride = false
+        controller.driver.toggleScope()
+        let context = try XCTUnwrap(calendar.transition)
+        controller.driver.toggleScope()
+        XCTAssertTrue(calendar.transition === context); XCTAssertFalse(context.settlingCommit)
+        let returned = expectation(for: NSPredicate { _, _ in MainActor.assumeIsolated { calendar.transitionState == .idle } }, evaluatedWith: nil)
+        await fulfillment(of: [returned], timeout: 3)
+        XCTAssertEqual(calendar.displayMode, .continuousMonths); XCTAssertEqual(calendar.frame.height, 420)
+    }
+
     @MainActor func testAllNineteenScenariosRenderNavigateSelectAndReset() throws {
         XCTAssertEqual(DemoScenario.allCases.count, 19)
         for scenario in DemoScenario.allCases {

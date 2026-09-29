@@ -117,9 +117,20 @@ selection and applies it on the next main-actor turn, after the selection callba
 `setDisplayMode(_:animated:)`, `beginInteractiveTransition(to:)`,
 `updateInteractiveTransition(progress:)`, and `finishInteractiveTransition(commit:animated:)`
 expose idle, interactive and settling states. Public page/mode stay at the source until
-completion. Cancellation restores the source; replacement cancels and restarts. Resizing
+completion. Cancellation restores the source. Paged-mode replacement cancels and restarts. Resizing
 or changing configuration cancels before rebuilding. Anchoring uses the latest selected
 visible day, then visible today, then the first eligible visible day.
+
+Continuous-month ↔ week switching uses one reversible 0.3-second ease-in-out timeline.
+The anchor week stays opaque and moves as a single row, even across month sections.
+Height starts at the actual viewport and expansion restores its remembered height;
+the connected-range showcase uses 420 points. The heading and weekday labels move
+with the viewport while surrounding rows, separators and short month titles fade.
+The destination grid replaces the rendering grid at matching geometry. Repeating a
+destination does nothing; requesting the opposite destination reverses the current
+timeline. Height callbacks report each transition frame, so containers should apply
+those heights synchronously without an additional animation or completion resize.
+Continuous mode remains button-only; the interactive gesture API is for paged scopes.
 
 Forward a dedicated `NSPanGestureRecognizer` from a scope handle above a list. Do not attach
 it to ordinary list scrolling. The demo shows this separation. A main-actor animation driver
