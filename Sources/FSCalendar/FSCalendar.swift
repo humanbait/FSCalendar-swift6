@@ -42,6 +42,7 @@ import FSCalendarCore
     var lastMonthAxis: CalendarScrollAxis = .horizontal
     var transitionPhase: CalendarTransitionState = .idle
     var transition: CalendarTransition?
+    var continuousViewportHeight: CGFloat?
     var isMutating = false
     var isLayingOut = false
     private var isResolvingPageSwipe = false
@@ -182,8 +183,13 @@ import FSCalendarCore
         let needsRepositionForSize = bounds.width != lastBoundsSize.width ||
             (bounds.height != lastBoundsSize.height && !renderingMode.isHorizontal)
         lastBoundsSize = bounds.size
-        let headerHeight = renderingMode.isContinuous ? 0 : effectiveHeaderHeight
-        titleLabel.isHidden = renderingMode.isContinuous
+        if transition == nil, mode.isContinuous, bounds.height > 0 { continuousViewportHeight = bounds.height }
+        let continuousTransition = transition.flatMap { $0.isContinuousScope ? $0 : nil }
+        let headerHeight = continuousTransition.map { effectiveHeaderHeight * (1 - $0.monthProgress) }
+            ?? (renderingMode.isContinuous ? 0 : effectiveHeaderHeight)
+        titleLabel.isHidden = continuousTransition == nil && renderingMode.isContinuous
+        titleLabel.alpha = continuousTransition.map { 1 - $0.monthProgress } ?? 1
+        titleLabel.clipsToBounds = true
         titleLabel.frame = CGRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         weekdayStack.frame = CGRect(x: 0, y: headerHeight, width: bounds.width, height: effectiveWeekdayHeight)
         let top = headerHeight + effectiveWeekdayHeight
@@ -195,7 +201,11 @@ import FSCalendarCore
         let isRTL = effectiveUserInterfaceLayoutDirection == .rightToLeft
         if calendarLayout.isRTL != isRTL { updateWeekdays(); needsPagePosition = true }
         calendarLayout.isRTL = isRTL
-        if needsPagePosition || (needsRepositionForSize && !isResolvingPageSwipe) {
+        if let context = continuousTransition {
+            collectionView.setContentOffset(context.continuousOffset, animated: false)
+            collectionView.layoutIfNeeded()
+            needsPagePosition = false
+        } else if needsPagePosition || (needsRepositionForSize && !isResolvingPageSwipe) {
             let renderedPage = transition?.renderPage ?? page
             if let section = try? engine.sectionIndex(for: renderedPage, scope: renderingMode.scope) {
                 collectionView.layoutIfNeeded()
@@ -292,7 +302,8 @@ import FSCalendarCore
     }
     func configure(_ cell: FSCalendarCell, occurrence: DayOccurrence) {
         var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
-        if renderingMode.isContinuous, occurrence.day.day == 1, content.title == nil {
+        let titleMode = transition.flatMap { $0.isContinuousScope ? $0.targetMode : nil } ?? renderingMode
+        if titleMode.isContinuous, occurrence.day.day == 1, content.title == nil {
             content.title = monthFormatter.shortStandaloneMonthSymbols[occurrence.day.month - 1]
         }
         let style = dataSource?.calendar(self, appearanceFor: occurrence.day) ?? DayAppearance()

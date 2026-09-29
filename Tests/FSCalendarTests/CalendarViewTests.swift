@@ -151,7 +151,7 @@ final class CalendarViewTests: XCTestCase {
         }
     }
 
-    @MainActor private func hostForAnimation(_ calendar: FSCalendar) -> (UIWindow, CalendarSpy) {
+    @MainActor private func hostForAnimation(_ calendar: FSCalendar, height initialHeight: CGFloat? = nil) -> (UIWindow, CalendarSpy) {
         let window: UIWindow
         if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
             window = UIWindow(windowScene: scene)
@@ -161,14 +161,15 @@ final class CalendarViewTests: XCTestCase {
         window.rootViewController = controller
         controller.view.addSubview(calendar)
         calendar.translatesAutoresizingMaskIntoConstraints = false
-        let height = calendar.heightAnchor.constraint(equalToConstant: calendar.preferredHeight)
+        let height = calendar.heightAnchor.constraint(equalToConstant: initialHeight ?? calendar.preferredHeight)
         NSLayoutConstraint.activate([height, calendar.topAnchor.constraint(equalTo: controller.view.topAnchor, constant: 100),
             calendar.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor),
             calendar.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor)])
         let spy = CalendarSpy()
         spy.onHeight = { [weak calendar, weak controller] in
             guard let calendar else { return }
-            height.constant = calendar.preferredHeight
+            height.constant = calendar.transitionState == .idle && calendar.displayMode.isContinuous
+                ? (initialHeight ?? calendar.preferredHeight) : calendar.preferredHeight
             controller?.view.layoutIfNeeded()
         }
         calendar.delegate = spy
@@ -394,6 +395,124 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertEqual(view.displayMode, .week)
         XCTAssertEqual(view.bounds.height, view.preferredHeight, accuracy: 0.5)
         XCTAssertFalse(spy.heights.isEmpty)
+    }
+
+    @MainActor func testContinuousScopeKeepsBoundaryWeekAndViewportInOneAnimation() throws {
+        let view = try make(.multiple)
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let (window, spy) = hostForAnimation(view, height: 400)
+        defer { window.isHidden = true }
+        view.reduceMotionOverride = false
+        let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+        try view.setSelection(boundary)
+        try view.setCurrentPage(boundary[0], animated: false)
+        view.layoutIfNeeded()
+        view.collectionView.contentOffset.y += 13.25
+        let initialOffset = view.collectionView.contentOffset
+        let pixel = 1 / view.traitCollection.displayScale
+        func cell(_ day: CivilDay) throws -> FSCalendarCell {
+            try XCTUnwrap(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.first {
+                $0.dayState?.occurrence.day == day
+            })
+        }
+        let originalY = try cell(boundary[1]).convert(cell(boundary[1]).bounds, to: view).minY
+        try view.prepareTransition(to: .week)
+        let context = try XCTUnwrap(view.transition)
+        XCTAssertTrue(context.isContinuousScope)
+        XCTAssertEqual(context.sourceHeight, 400, accuracy: pixel)
+        XCTAssertEqual(view.collectionView.contentOffset, initialOffset)
+        XCTAssertEqual(try cell(boundary[1]).convert(cell(boundary[1]).bounds, to: view).minY, originalY, accuracy: pixel)
+        for progress: CGFloat in [0, 0.25, 0.5, 0.75, 1] {
+            view.updateInteractiveTransition(progress: progress)
+            XCTAssertEqual(view.bounds.height, 400 + (context.targetHeight - 400) * progress, accuracy: pixel)
+            for day in boundary {
+                XCTAssertEqual(try cell(day).alpha, 1)
+                XCTAssertEqual(try cell(day).convert(cell(day).bounds, to: view).minY,
+                    originalY + (view.effectiveHeaderHeight + view.effectiveWeekdayHeight - originalY) * progress, accuracy: pixel)
+            }
+        }
+        let beforeCommit = try cell(boundary[1]).convert(cell(boundary[1]).bounds, to: view)
+        view.finishInteractiveTransition(commit: true, animated: false)
+        XCTAssertEqual(try cell(boundary[1]).convert(cell(boundary[1]).bounds, to: view).minY, beforeCommit.minY, accuracy: pixel)
+        XCTAssertEqual(try cell(boundary[1]).titleLabel.text, "1")
+        let weekHeight = view.bounds.height
+        try view.setDisplayMode(.continuousMonths)
+        XCTAssertEqual(view.transition?.targetHeight, 400)
+        XCTAssertEqual(view.transition?.animator?.duration, 0.3)
+        waitForAnimationFrame("Continuous viewport expands through an intermediate height") {
+            guard let height = view.layer.presentation()?.bounds.height else { return false }
+            return height > weekHeight + 1 && height < 399
+        }
+        waitUntil("Continuous scope finishes") { view.transitionState == .idle }
+        XCTAssertEqual(view.bounds.height, 400, accuracy: pixel)
+        XCTAssertEqual(try cell(boundary[1]).titleLabel.text, "Mar")
+        XCTAssertTrue(view.titleLabel.isHidden)
+        XCTAssertEqual(view.selectedDays, boundary)
+        XCTAssertEqual(spy.heights.last, 400)
+    }
+
+    @MainActor func testContinuousScopeReversesAndIgnoresRepeatedTarget() throws {
+        let view = try make()
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let (window, spy) = hostForAnimation(view, height: 400)
+        defer { withExtendedLifetime(spy) {}; window.isHidden = true }
+        view.reduceMotionOverride = false
+        waitForAnimationFrame("Continuous viewport is presented") {
+            abs((view.layer.presentation()?.bounds.height ?? 0) - 400) < 0.5
+        }
+        try view.setDisplayMode(.week)
+        let context = try XCTUnwrap(view.transition)
+        try view.setDisplayMode(.week)
+        XCTAssertTrue(view.transition === context)
+        waitForAnimationFrame("Collapse is underway") {
+            let height = view.layer.presentation()?.bounds.height ?? 400
+            return height < 399 && height > context.targetHeight + 1
+        }
+        try view.setDisplayMode(.continuousMonths)
+        XCTAssertTrue(view.transition === context)
+        XCTAssertTrue(try XCTUnwrap(context.animator).isReversed)
+        waitUntil("Reversal returns to the continuous viewport") { view.transitionState == .idle }
+        XCTAssertEqual(view.displayMode, .continuousMonths)
+        XCTAssertEqual(view.bounds.height, 400, accuracy: 0.5)
+        XCTAssertEqual(view.collectionView.transform, .identity)
+        XCTAssertTrue(view.collectionView.isScrollEnabled)
+        XCTAssertTrue(context.titleFades.allSatisfy { $0.outgoing.superview == nil && $0.label.alpha == 1 })
+    }
+
+    @MainActor func testContinuousScopeFractionalGeometryRTLAndResizeCancellation() throws {
+        for rtl in [false, true] {
+            let view = try make(.multiple)
+            view.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+            view.appearance.rowHeight = 61.375
+            try view.setDisplayMode(.continuousMonths, animated: false)
+            let (window, spy) = hostForAnimation(view, height: 400.5)
+            defer { withExtendedLifetime(spy) {}; window.isHidden = true }
+            let days = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+            try view.setSelection(days)
+            try view.setCurrentPage(days[1], animated: false)
+            view.layoutIfNeeded()
+            let offset = view.collectionView.contentOffset
+            try view.prepareTransition(to: .week)
+            let context = try XCTUnwrap(view.transition)
+            view.updateInteractiveTransition(progress: 0.5)
+            let cells = view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }
+            let first = try XCTUnwrap(cells.first { $0.dayState?.occurrence.day == days[0] })
+            let second = try XCTUnwrap(cells.first { $0.dayState?.occurrence.day == days[1] })
+            XCTAssertEqual(first.alpha, 1); XCTAssertEqual(second.alpha, 1)
+            XCTAssertEqual(first.frame.minY, second.frame.minY, accuracy: 0.01)
+            XCTAssertEqual(first.frame.height, view.effectiveRowHeight, accuracy: 0.01)
+            XCTAssertEqual(first.frame.minX > second.frame.minX, rtl)
+            window.frame.size.width -= 30.5
+            window.rootViewController?.view.frame.size.width -= 30.5
+            window.rootViewController?.view.setNeedsLayout()
+            window.rootViewController?.view.layoutIfNeeded()
+            XCTAssertEqual(view.transitionState, .idle)
+            XCTAssertEqual(view.displayMode, .continuousMonths)
+            XCTAssertEqual(view.collectionView.contentOffset.y, offset.y, accuracy: 0.5)
+            XCTAssertEqual(view.bounds.height, 400.5, accuracy: 0.5)
+            XCTAssertTrue(context.titleFades.allSatisfy { $0.outgoing.superview == nil })
+            XCTAssertEqual(view.selectedDays, days)
+        }
     }
 
     @MainActor func testVariableMonthHeightAnimatesAndRapidReversalEndsAtLatestPage() throws {

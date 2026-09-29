@@ -2,7 +2,7 @@ import CalendarDemoSupport
 import UIKit
 import XCTest
 import FSCalendarCore
-import FSCalendar
+@testable import FSCalendar
 @testable import CalendarShowcase
 
 final class SharedDriverTests: XCTestCase {
@@ -354,6 +354,98 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertTrue(driver.state.selection.isEmpty)
         XCTAssertEqual(driver.view.bounds.height, 400, accuracy: 0.5)
     }
+    @MainActor func testConnectedRangeScopePresentationFramesStayOnOneTimeline() throws {
+        let window = (UIApplication.shared.delegate as! AppDelegate).window!
+        let originalRoot = window.rootViewController
+        defer { window.rootViewController = originalRoot; window.overrideUserInterfaceStyle = .unspecified; window.makeKeyAndVisible() }
+        let page = ScenarioController(scenario: .connectedRange)
+        window.rootViewController = UINavigationController(rootViewController: page)
+        window.makeKeyAndVisible(); page.view.layoutIfNeeded()
+        let driver = try XCTUnwrap(page.driver as? SwiftCalendarDriver)
+        let calendar = driver.calendar
+        calendar.reduceMotionOverride = false
+        let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+        try calendar.setSelection(boundary)
+        func waitForFrame(_ description: String, _ condition: @escaping @MainActor () -> Bool) {
+            let ready = expectation(description: description)
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 120, repeats: true) { timer in
+                if MainActor.assumeIsolated({ condition() }) { timer.invalidate(); ready.fulfill() }
+            }
+            defer { timer.invalidate() }
+            wait(for: [ready], timeout: 3)
+        }
+        let pixel = 1 / calendar.traitCollection.displayScale
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            window.overrideUserInterfaceStyle = style
+            page.view.layoutIfNeeded()
+            waitForFrame("Initial continuous viewport is displayed") {
+                abs((calendar.layer.presentation()?.bounds.height ?? 0) - 400) <= pixel
+            }
+            // Keep a fractional scroll position to catch a preparation-time page snap.
+            calendar.collectionView.contentOffset.y += 11.25
+            for target: CalendarDisplayMode in [.week, .continuousMonths] {
+                let beforeHeight = calendar.layer.presentation()?.bounds.height ?? calendar.bounds.height
+                driver.toggleScope()
+                let context = try XCTUnwrap(calendar.transition)
+                let animator = try XCTUnwrap(context.animator)
+                XCTAssertEqual(animator.duration, 0.3)
+                animator.pauseAnimation()
+                var trace: [[String: Double]] = []
+                for fraction: CGFloat in [0, 0.25, 0.5, 0.75, 1] {
+                    animator.fractionComplete = fraction
+                    let expected = context.sourceHeight + (context.targetHeight - context.sourceHeight) * fraction
+                    waitForFrame("Scope frame \(fraction) is displayed") {
+                        abs((calendar.layer.presentation()?.bounds.height ?? 0) - expected) <= pixel
+                    }
+                    let height = try XCTUnwrap(calendar.layer.presentation()).bounds.height
+                    let header = try XCTUnwrap(calendar.weekdayStack.layer.presentation()).frame.minY
+                    let monthFraction = target.isContinuous ? fraction : 1 - fraction
+                    XCTAssertEqual(header, calendar.effectiveHeaderHeight * (1 - monthFraction), accuracy: pixel)
+                    if fraction == 0 { XCTAssertEqual(height, beforeHeight, accuracy: pixel) }
+                    for day in boundary {
+                        let cell = try XCTUnwrap(calendar.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }
+                            .first { $0.dayState?.occurrence.day == day })
+                        XCTAssertEqual(cell.layer.presentation()?.opacity, 1)
+                    }
+                    for cell in calendar.collectionView.visibleCells {
+                        let index = try XCTUnwrap(calendar.collectionView.indexPath(for: cell))
+                        let row = (calendar.calendarLayout.continuousSections[index.section].startSlot + index.item) / 7
+                        if row != context.focusedRow {
+                            XCTAssertEqual(Double(cell.layer.presentation()?.opacity ?? -1), Double(monthFraction), accuracy: 0.01)
+                        }
+                    }
+                    XCTAssertLessThanOrEqual(try XCTUnwrap(calendar.titleLabel.layer.presentation()).frame.maxY, header + pixel)
+                    trace.append(["fraction": Double(fraction), "height": Double(height), "header": Double(header)])
+                    let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                        XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: false))
+                    }
+                    let attachment = XCTAttachment(image: image)
+                    attachment.name = "scope-\(style == .dark ? "dark" : "light")-\(target.isContinuous ? "expand" : "collapse")-\(Int(fraction * 100))"
+                    attachment.lifetime = .keepAlways; add(attachment)
+                }
+                let lastHeight = try XCTUnwrap(calendar.layer.presentation()).bounds.height
+                animator.stopAnimation(false); animator.finishAnimation(at: .end)
+                page.view.layoutIfNeeded()
+                XCTAssertEqual(calendar.transitionState, .idle)
+                XCTAssertEqual(calendar.displayMode, target)
+                XCTAssertEqual(calendar.bounds.height, lastHeight, accuracy: pixel)
+                XCTAssertEqual(calendar.selectedDays, boundary)
+                XCTAssertTrue(context.titleFades.allSatisfy { $0.outgoing.superview == nil })
+                let data = try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys])
+                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                attachment.name = "scope-presentation-\(style.rawValue)-\(target.scope.rawValue)"; attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
+        calendar.reduceMotionOverride = true
+        driver.toggleScope()
+        XCTAssertEqual(calendar.transitionState, .idle)
+        XCTAssertEqual(calendar.displayMode, .week)
+        driver.toggleScope()
+        XCTAssertEqual(calendar.transitionState, .idle)
+        XCTAssertEqual(calendar.bounds.height, 400, accuracy: pixel)
+    }
+
     @MainActor func testSwiftRepeatedNavigationPerformance() {
         let driver = SwiftCalendarDriver(scenario: .month)
         let window = host(driver); defer { window.isHidden = true }

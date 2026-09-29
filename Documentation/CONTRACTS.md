@@ -64,7 +64,7 @@ Validate the complete proposed selection, consult a synchronous veto, commit onc
 
 ## Transition state
 
-Idle, interactive, and settling states retain source/target mode, source/target page, anchor day, and progress. Public mode and page commit on completion. Cancellation restores the source; a replacement request cancels the previous transition before starting the new one. Configuration and geometry changes cancel before applying new state.
+Idle, interactive, and settling states retain source/target mode, source/target page, anchor day, and progress. Public mode and page commit on completion. Cancellation restores the source; a replacement request cancels the previous transition before starting the new one. During a UIKit continuous-month/week animation, requesting the source reverses the current animator and requesting its existing destination is a no-op. Configuration and geometry changes cancel before applying new state.
 
 ## UIKit animation integration
 
@@ -72,7 +72,9 @@ Accepted additions to the selection bounce visible selection circles for 0.15 se
 
 Variable-row month height changes and month/week scope transitions use 0.3-second ease-in-out animation. Paged swipes update the destination page and start resizing at drag release, alongside deceleration; scroll completion only reconciles an interrupted or changed destination. Scope transitions keep the focused row opaque while surrounding rows fade; interactive dragging drives height, row position, and opacity together. Reduce Motion and nonanimated requests apply final geometry immediately.
 
-In `calendar(_:preferredHeightDidChange:animated:)`, update the application's height constraint and call its container's `layoutIfNeeded()` synchronously. Animated notifications run inside the calendar's animation context; starting another animation in the delegate can desynchronize the surrounding layout. Interactive notifications carry `animated == false`. Identical heights remain suppressed per delegate, and initial layout uses `preferredHeight` directly.
+UIKit continuous-month/week transitions use the same focused-week motion, including weeks shared by adjacent month sections. They start at the actual viewport height and fractional scroll offset; returning to continuous mode restores its most recently laid-out viewport height. The header, weekdays, month separators and short-month labels transition within the same animation. Continuous mode still has no intrinsic viewport height, and interactive scope gestures remain unsupported there.
+
+In `calendar(_:preferredHeightDidChange:animated:)`, update the application's height constraint and call its container's `layoutIfNeeded()` synchronously. Animated notifications run inside the calendar's animation context; starting another animation in the delegate can desynchronize the surrounding layout. Interactive notifications carry `animated == false`. Identical heights remain suppressed per delegate, and initial paged layout uses `preferredHeight` directly. Hosts that supply a fixed continuous viewport must forward transition heights while `transitionState` is active; reapplying the fixed height during the animation prevents the container from moving with its rows. The connected-range example restores its 400-point viewport without a second completion resize.
 
 ## Defaults
 

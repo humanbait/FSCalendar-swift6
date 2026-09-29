@@ -8,6 +8,8 @@ import FSCalendarCore
     let scenario: DemoScenario
     var onChange: (() -> Void)?
     var onHeightChange: ((CGFloat, Bool) -> Void)?
+    private var requestedMode: CalendarDisplayMode?
+    private var deliveredHeight: CGFloat?
     private(set) var events: [String] = []
     var view: UIView { calendar }
     var initialHeight: CGFloat { [.continuous, .connectedRange].contains(scenario) ? 400 : calendar.preferredHeight }
@@ -47,6 +49,7 @@ import FSCalendarCore
         reset()
     }
     func reset() {
+        requestedMode = nil
         perform { try calendar.clearSelection(); try calendar.setDisplayMode(initialMode, animated: false)
             try calendar.setCurrentPage(DemoFixtures.initialDate, animated: false) }
         calendar.today = try? CivilDay(date: DemoFixtures.initialDate, timeZone: DemoFixtures.calendar.timeZone)
@@ -58,7 +61,10 @@ import FSCalendarCore
     func toggleScope() {
         guard scenario != .continuous else { return }
         let monthMode: CalendarDisplayMode = scenario == .connectedRange ? .continuousMonths : .month(.horizontal)
-        perform { try calendar.setDisplayMode(calendar.displayMode == .week ? monthMode : .week) }
+        let current = calendar.transitionState == .idle ? calendar.displayMode : (requestedMode ?? calendar.displayMode)
+        let target: CalendarDisplayMode = current == .week ? monthMode : .week
+        requestedMode = target
+        perform { try calendar.setDisplayMode(target) }
     }
     func handleScopeGesture(_ gesture: UIPanGestureRecognizer) { calendar.handleScopeGesture(gesture) }
     func reloadContent() { calendar.reloadData(); onChange?() }
@@ -124,15 +130,21 @@ import FSCalendarCore
     func calendarCurrentPageDidChange(_ calendar: FSCalendar) { append("page \(calendar.currentPage)") }
     func calendar(_ calendar: FSCalendar, didChangeDisplayMode mode: CalendarDisplayMode) {
         if scenario == .connectedRange {
-            onHeightChange?(mode.isContinuous ? 400 : calendar.preferredHeight, false)
+            deliverHeight(mode.isContinuous ? 400 : calendar.preferredHeight, animated: false)
         }
         append("mode \(mode.scope.rawValue)")
     }
     func calendar(_ calendar: FSCalendar, preferredHeightDidChange height: CGFloat, animated: Bool) {
         if scenario != .continuous {
-            onHeightChange?(scenario == .connectedRange && calendar.displayMode.isContinuous ? 400 : height, animated)
+            let fixedViewport = scenario == .connectedRange && calendar.displayMode.isContinuous && calendar.transitionState == .idle
+            deliverHeight(fixedViewport ? 400 : height, animated: animated)
         }
         onChange?()
+    }
+    private func deliverHeight(_ height: CGFloat, animated: Bool) {
+        guard height != deliveredHeight else { return }
+        deliveredHeight = height
+        onHeightChange?(height, animated)
     }
     private func append(_ event: String) {
         events.append(event)

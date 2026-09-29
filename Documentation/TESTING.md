@@ -190,3 +190,37 @@ beside equal-height selected bands with no focus outline. iPhone light/dark capt
 retain event dots and month separators. Evidence remains in ignored `artifacts/`.
 No source files were added, so project regeneration was unnecessary. Exact Swift 6.2,
 iOS 16, macOS 13 and manual VoiceOver remain untested release gates.
+
+## Smooth UIKit continuous/week scope animation — 2026-09-29
+
+Continuous-month/week switching now keeps the anchor week visible on one 0.3-second
+UIKit animator, including rows owned by two adjacent month sections. Height starts
+from the actual viewport; expanding restores the remembered continuous height. Header,
+weekday placement, other rows, separators and first-day labels share that timeline.
+Repeated destinations do not restart it, and opposite requests reverse it in place.
+The connected-range driver forwards transition heights and suppresses duplicate final
+height updates. AppKit and public APIs are unchanged.
+
+Validated on Xcode 27.1 / Swift 6.4 and the physical iPhone 11 running iOS 17.7.2:
+
+| Check | Result | Local evidence under `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 40 passed | `smooth-scope-final-20260929T083936687554Z/package.log` |
+| Full iPhone hosted suite and connected-range UI test | 68 passed (67 hosted + 1 UI) | `smooth-scope-final-20260929T083936687554Z/` |
+
+Tests sample the actual presentation layers at 0, 25, 50, 75 and 100 percent in both
+directions and both appearances. They assert synchronized viewport/header motion,
+opaque boundary-week cells, fading surrounding rows, no header/weekday overlap, and
+no preparation or completion height jump beyond one display pixel. Retained window
+captures and JSON frame traces accompany these checks. Additional regressions cover
+fractional scrolling, February 29–March 1, selected bands and dots, short month labels,
+RTL, Dynamic Type row sizing, resize cancellation, rapid reversal, Reduce Motion and
+transition cleanup. Existing paged-month/week animation tests also pass.
+
+Intermediate frame inspection exposed header overlap and late-created rows missing
+the fade; both were corrected before the final run. Inspected the final light/dark
+frame sequences for coordinated motion and preserved cell styling. The iPhone UI test
+also exercises ordinary button-driven scope round trips. No source files were added,
+so project regeneration was unnecessary. macOS UI validation was not repeated because
+its renderer and demo were unchanged. Exact Swift 6.2, iOS 16 and manual VoiceOver
+remain untested release gates; evidence stays under ignored `artifacts/`.
