@@ -30,7 +30,7 @@ Performance tests collect five XCTest clock/memory samples for twelve month navi
 
 ## Reproducibility
 
-Launch arguments: `--scenario SCENARIO`. Names: `month`, `vertical`, `week`, `continuous`, `multiple`, `swipe`, `hidden`, `variable`, `sixRows`, `bounds`, `content`, `custom`, `range`, `connectedRange`, `scope`, `dynamicHeight`, `rtl`, `largeText`, `dark`. The showcase lists `connectedRange` separately under **Combined usage**. It opens in vertically scrolling continuous months; only the Scope button switches to week scope and back. Tap two days to select an inclusive band; later taps outside extend it, while taps inside leave it unchanged.
+Launch arguments: `--scenario SCENARIO`. Names: `month`, `vertical`, `week`, `continuous`, `multiple`, `swipe`, `hidden`, `variable`, `sixRows`, `bounds`, `content`, `custom`, `range`, `connectedRange`, `scope`, `dynamicHeight`, `rtl`, `largeText`, `dark`. The showcase lists `connectedRange` separately under **Combined usage**. It opens in vertically scrolling continuous months; only the Scope button switches to week scope and back. Tap two days to select an inclusive band; later taps outside extend it, while taps inside leave it unchanged. Connected-range titles are centered in their cells. Days 1, 5, 9, 14, 18, 22, and 29 have one sample event dot below the title, using the event color normally and the selected-title color inside a band; accessibility values include “Has events”.
 
 Fixtures: Gregorian, GMT, en_US_POSIX, initial/today 2024-02-14, bounds 2020-01-01...2030-12-31 (bounds scenario 2024-02-10...2024-03-20). Large Text uses a container content-size override. This does not change the phone's global text-size setting.
 
@@ -124,3 +124,35 @@ an existing continuous-grid API. Cleaning `artifacts/MacDerivedData` with `xcode
 resolved it; the full rerun passed without changing the Core model. The generated project
 diff adds the UIKit decoration source; AppKit discovers its source through SwiftPM.
 Exact Swift 6.2, iOS 16, macOS 13, and manual VoiceOver remain untested release gates.
+
+## Centered connected-range titles and event dots — 2026-09-29
+
+The UIKit and AppKit connected-range examples center both numeric and short-month
+titles in the full cell. A private four-point layer displays one dot three points below
+the title on the shared sample event dates. Selected dots use the selected-title color;
+normal dots honor the event color. Standard cells and library APIs are unchanged.
+
+Validated with Xcode 27.1, Swift 6.4, macOS 27.0 arm64, and the physical iPhone 11:
+
+| Check | Result | Local evidence under `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 40 passed | `connected-events-verified-20260929T075332Z/package.log` |
+| Full macOS validation runner | 36 hosted/UI tests passed | `connected-events-final-20260929T074837Z/` |
+| Final Mac example tests and connected-range UI test | 6 passed | `connected-events-verified-20260929T075332Z/` |
+| Final physical-iPhone example tests and connected-range UI test | 10 passed | `connected-events-complete-20260929T075329705602Z/` |
+
+The full Mac pass preceded the final explicit dot layer ordering; the focused rerun
+covers that final implementation. Assertions check title/circle centers, fractional
+sizes, RTL, single-dot counts and spacing, selected/custom/theme colors, inherited-dot
+suppression, reuse, targeted reloads, accessibility values, February–March boundaries,
+and continuous/week round trips. An initial UIKit scope assertion inspected retained
+reusable subviews; it now reads visible cells and waits for their expected configuration.
+The final run passes without relaxing the title or event assertions.
+
+Light/dark `swift-connected-events-*` and `appkit-connected-events-*` captures were
+inspected. AppKit bitmap caching does not faithfully composite custom sublayers over
+native subviews or selective corner masks; the window-only
+`appkit-connected-range-continuous` UI capture verifies visible white dots and connected
+bands. Evidence stays in ignored `artifacts/`. Exact Swift 6.2, iOS 16, macOS 13, and
+manual VoiceOver checks remain untested release gates. No new source files were added,
+so project regeneration was unnecessary.

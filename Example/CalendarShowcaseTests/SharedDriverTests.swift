@@ -121,6 +121,76 @@ final class SharedDriverTests: XCTestCase {
         driver.reset()
         XCTAssertTrue(driver.state.selection.isEmpty)
     }
+    @MainActor func testConnectedRangeCenteredTitlesAndEventReuse() throws {
+        let driver = SwiftCalendarDriver(scenario: .connectedRange)
+        for number in 1...31 {
+            let day = try CivilDay(year: 2024, month: 3, day: number)
+            let content = driver.calendar(driver.calendar, contentFor: day)
+            XCTAssertEqual(content.numberOfEvents, [1, 5, 9, 14, 18, 22, 29].contains(number) ? 1 : 0)
+        }
+        let cell = ConnectedRangeSwiftCell(frame: .zero)
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        let occurrence = try XCTUnwrap(CalendarEngine(configuration: CalendarConfiguration())
+            .continuousMonthGrid(containing: day).occurrences.first { $0.day == day })
+        var appearance = FSCalendarAppearance()
+        appearance.eventColor = .red; appearance.selectedTitleColor = .white
+        for size in [CGSize(width: 56, height: 44), CGSize(width: 70.3, height: 59.5)] {
+            for rtl in [false, true] {
+                cell.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+                for selected in [false, true] {
+                    for count in [0, 1, 5] {
+                        for title in ["14", "Mar"] {
+                            cell.frame = CGRect(origin: .zero, size: size)
+                            cell.apply(content: DayContent(title: title, numberOfEvents: count),
+                                state: DayState(occurrence: occurrence, isSelected: selected, isToday: true),
+                                appearance: appearance, style: DayAppearance())
+                            cell.setNeedsLayout(); cell.layoutIfNeeded()
+                            let layers = (cell.contentView.layer.sublayers ?? []).filter { $0.name == "connectedRange.event" }
+                            XCTAssertEqual(layers.count, 1)
+                            let dot = try XCTUnwrap(layers.first)
+                            XCTAssertEqual(cell.titleLabel.frame.midX, size.width / 2, accuracy: 0.001)
+                            XCTAssertEqual(cell.titleLabel.frame.midY, size.height / 2, accuracy: 0.001)
+                            XCTAssertEqual(cell.selectionBackground.frame.midY, size.height / 2, accuracy: 0.001)
+                            XCTAssertEqual(dot.frame.midX, size.width / 2, accuracy: 0.001)
+                            XCTAssertEqual(dot.frame.minY - cell.titleLabel.frame.maxY, 3, accuracy: 0.001)
+                            XCTAssertEqual(dot.frame.size, CGSize(width: 4, height: 4))
+                            XCTAssertGreaterThan(dot.zPosition, cell.selectionBackground.layer.zPosition)
+                            XCTAssertLessThanOrEqual(dot.frame.maxY, size.height - 3)
+                            XCTAssertEqual(dot.isHidden, count == 0)
+                            XCTAssertEqual(dot.backgroundColor, (selected ? appearance.selectedTitleColor : appearance.eventColor).cgColor)
+                            let value = cell.accessibilityValue ?? ""
+                            XCTAssertEqual(value.components(separatedBy: "Has events").count - 1, count > 0 ? 1 : 0)
+                            XCTAssertTrue(value.lowercased().contains("today"))
+                            XCTAssertEqual(cell.accessibilityTraits.contains(.selected), selected)
+                            XCTAssertTrue(cell.contentView.subviews.compactMap { $0 as? UIStackView }.allSatisfy(\.isHidden))
+                        }
+                    }
+                }
+            }
+        }
+        cell.apply(content: DayContent(numberOfEvents: 1, accessibilityValue: "Meeting"),
+            state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
+            appearance: appearance, style: DayAppearance(eventColor: .green))
+        let dot = try XCTUnwrap((cell.contentView.layer.sublayers ?? []).first { $0.name == "connectedRange.event" })
+        XCTAssertEqual(dot.backgroundColor, UIColor.green.cgColor)
+        XCTAssertTrue((cell.accessibilityValue ?? "").contains("Meeting"))
+        appearance.eventColor = .label
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            cell.overrideUserInterfaceStyle = style
+            cell.apply(content: DayContent(numberOfEvents: 1),
+                state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
+                appearance: appearance, style: DayAppearance())
+            XCTAssertEqual(dot.backgroundColor, UIColor.label.resolvedColor(with: cell.traitCollection).cgColor)
+        }
+        cell.prepareForReuse()
+        XCTAssertTrue(dot.isHidden)
+        XCTAssertNil(dot.backgroundColor)
+        cell.apply(content: DayContent(), state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
+                   appearance: appearance, style: DayAppearance())
+        XCTAssertTrue(dot.isHidden)
+        XCTAssertFalse((cell.accessibilityValue ?? "").contains("Has events"))
+    }
+
     @MainActor func testConnectedRangeBandGeometryAndReuse() throws {
         let driver = SwiftCalendarDriver(scenario: .connectedRange)
         let window = host(driver); defer { window.isHidden = true }
@@ -128,7 +198,10 @@ final class SharedDriverTests: XCTestCase {
         try driver.calendar.setSelection(days)
         driver.calendar.reloadData(); driver.view.layoutIfNeeded()
         func cells(in view: UIView) -> [FSCalendarCell] {
-            (view as? FSCalendarCell).map { [$0] } ?? view.subviews.flatMap(cells)
+            if let collection = view as? UICollectionView {
+                return collection.visibleCells.compactMap { $0 as? FSCalendarCell }
+            }
+            return view.subviews.flatMap(cells)
         }
         func band(_ number: Int) throws -> ConnectedRangeSwiftCell {
             let expectedDay = days[number - 16]
@@ -163,6 +236,33 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertEqual(march.selectionBackground.layer.maskedCorners, right)
         XCTAssertEqual(boundaryCells.filter { $0.dayState?.occurrence.day == boundary[0] }.count, 1)
         XCTAssertEqual(march.titleLabel.text, "Mar")
+        for cell in [february, march] {
+            let dot = try XCTUnwrap((cell.contentView.layer.sublayers ?? []).first { $0.name == "connectedRange.event" })
+            XCTAssertFalse(dot.isHidden)
+            XCTAssertEqual(cell.titleLabel.frame.midY, cell.contentView.bounds.midY, accuracy: 0.01)
+            XCTAssertEqual(dot.backgroundColor, UIColor.white.cgColor)
+            XCTAssertTrue((cell.accessibilityValue ?? "").contains("Has events"))
+            XCTAssertTrue((cell.accessibilityLabel ?? "").contains("2024"))
+        }
+        driver.calendar.reload(dates: Set(boundary))
+        XCTAssertEqual((march.accessibilityValue ?? "").components(separatedBy: "Has events").count, 2)
+
+        for mode: CalendarDisplayMode in [.week, .continuousMonths] {
+            try driver.calendar.setDisplayMode(mode, animated: false)
+            let title = mode.isContinuous ? "Mar" : "1"
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                MainActor.assumeIsolated {
+                    driver.view.layoutIfNeeded()
+                    return cells(in: driver.view).first { $0.dayState?.occurrence.day == boundary[1] }?.titleLabel.text == title
+                }
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 3), .completed)
+            let cell = try XCTUnwrap(cells(in: driver.view).first { $0.dayState?.occurrence.day == boundary[1] })
+            XCTAssertEqual(cell.titleLabel.text, mode.isContinuous ? "Mar" : "1")
+            XCTAssertEqual(cell.titleLabel.frame.midY, cell.contentView.bounds.midY, accuracy: 0.01)
+            let dot = try XCTUnwrap((cell.contentView.layer.sublayers ?? []).first { $0.name == "connectedRange.event" })
+            XCTAssertFalse(dot.isHidden)
+        }
         try driver.calendar.setCurrentPage(days[0], animated: false)
         for (name, style) in [("light", UIUserInterfaceStyle.light), ("dark", .dark)] {
             window.overrideUserInterfaceStyle = style
@@ -178,7 +278,7 @@ final class SharedDriverTests: XCTestCase {
                 XCTAssertTrue(driver.view.drawHierarchy(in: driver.view.bounds, afterScreenUpdates: true))
             }
             let attachment = XCTAttachment(image: image)
-            attachment.name = "swift-month-separators-\(name)"; attachment.lifetime = .keepAlways
+            attachment.name = "swift-connected-events-\(name)"; attachment.lifetime = .keepAlways
             add(attachment)
         }
         window.overrideUserInterfaceStyle = .unspecified

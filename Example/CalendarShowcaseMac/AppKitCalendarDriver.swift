@@ -80,7 +80,8 @@ import FSCalendarCore
         return DayContent(title: scenario == .content && day.day == 1 ? "1st" : nil,
                           subtitle: scenario == .content ? date.map(DemoFixtures.lunarSubtitle) : nil,
                           image: scenario == .content && day.day == 14 ? NSImage(systemSymbolName: "heart.fill", accessibilityDescription: "Heart") : nil,
-                          numberOfEvents: [.content, .custom].contains(scenario) ? day.day % 4 : 0)
+                          numberOfEvents: scenario == .connectedRange ? DemoFixtures.connectedRangeEventCount(dayOfMonth: day.day) :
+                            ([.content, .custom].contains(scenario) ? day.day % 4 : 0))
     }
     func calendar(_ calendar: FSCalendarView, appearanceFor day: CivilDay) -> DayAppearance {
         if scenario == .range { return DayAppearance(cornerRadius: 8) }
@@ -143,12 +144,36 @@ import FSCalendarCore
 }
 
 @MainActor class ConnectedRangeAppKitItem: FSCalendarItem {
+    // A layer supplies decoration without adding an input or accessibility target.
+    private let eventIndicator: CALayer = {
+        let layer = CALayer()
+        layer.name = "connectedRange.event"; layer.cornerRadius = 2; layer.isHidden = true
+        layer.zPosition = 1 // Stay above the selection background when native subviews reorder their layers.
+        layer.actions = ["position": NSNull(), "bounds": NSNull(), "backgroundColor": NSNull(), "hidden": NSNull()]
+        return layer
+    }()
+
     override func apply(content: DayContent, state: DayState, appearance: FSCalendarAppearance, style: DayAppearance) {
-        super.apply(content: content, state: state, appearance: appearance, style: style)
+        var baseContent = content
+        baseContent.numberOfEvents = 0 // This example owns its single event indicator.
+        super.apply(content: baseContent, state: state, appearance: appearance, style: style)
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        if eventIndicator.superlayer == nil { view.layer?.addSublayer(eventIndicator) }
+        eventIndicator.isHidden = content.numberOfEvents == 0
+        eventIndicator.backgroundColor = (state.isSelected ? appearance.selectedTitleColor :
+            (style.eventColor ?? appearance.eventColor)).cgColor
+        if content.numberOfEvents > 0 {
+            let value = [(view.accessibilityValue() as? String), "Has events"].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+            view.setAccessibilityValue(value)
+        }
     }
     override func viewDidLayout() {
         super.viewDidLayout()
+        let bounds = view.bounds
+        titleLabel.frame.origin = CGPoint(x: bounds.midX - titleLabel.frame.width / 2,
+                                          y: bounds.midY - titleLabel.frame.height / 2)
+        selectionBackground.frame.origin.y = bounds.midY - selectionBackground.frame.height / 2
+        eventIndicator.frame = CGRect(x: bounds.midX - 2, y: titleLabel.frame.maxY + 3, width: 4, height: 4)
         let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
                                         .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
         guard let day = dayState?.occurrence.day, dayState?.isSelected == true else {
@@ -179,6 +204,7 @@ import FSCalendarCore
     }
     override func prepareForReuse() {
         super.prepareForReuse()
+        eventIndicator.isHidden = true; eventIndicator.backgroundColor = nil
         selectionBackground.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
                                                      .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
     }

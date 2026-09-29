@@ -67,6 +67,10 @@ public enum DemoFixtures {
     public static let initialDate = date("2024-02-14")
     public static let minimumDate = date("2020-01-01")
     public static let maximumDate = date("2030-12-31")
+    /// Sparse event fixtures shared by the connected-range examples.
+    public static func connectedRangeEventCount(dayOfMonth: Int) -> Int {
+        [1, 5, 9, 14, 18, 22, 29].contains(dayOfMonth) ? 1 : 0
+    }
     public static func lunarSubtitle(_ date: Date) -> String {
         var lunar = Calendar(identifier: .chinese)
         lunar.timeZone = calendar.timeZone

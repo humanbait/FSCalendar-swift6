@@ -102,9 +102,11 @@ final class MacUITests: XCTestCase {
         XCTAssertFalse(app.textFields["calendar.heading"].exists)
         let february = app.buttons["day.2024-02-29.1.2024-02-01"]
         let march = app.buttons["day.2024-03-01.1.2024-03-01"]
+        XCTAssertTrue((february.value as? String ?? "").contains("Has events"))
+        XCTAssertTrue((march.value as? String ?? "").contains("Has events"))
         XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)
         XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 1)
-        let image = XCTAttachment(screenshot: app.screenshot())
+        let image = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         image.name = "appkit-connected-range-continuous"
         image.lifetime = .keepAlways
         add(image)
@@ -123,7 +125,7 @@ final class MacUITests: XCTestCase {
         expectation(for: NSPredicate(format: "value CONTAINS %@", "• month"), evaluatedWith: readout)
         waitForExpectations(timeout: 5)
         XCTAssertTrue((readout.value as? String ?? "").contains("2024-02-21"))
-        let roundTrip = XCTAttachment(screenshot: app.screenshot())
+        let roundTrip = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         roundTrip.name = "appkit-connected-range-scope-round-trip"
         roundTrip.lifetime = .keepAlways
         add(roundTrip)
