@@ -900,6 +900,32 @@ final class CalendarViewTests: XCTestCase {
         view.layoutIfNeeded()
         XCTAssertEqual(view.currentPage, try CivilDay(year: 2024, month: 2, day: 1))
     }
+    @MainActor func testCompactWeekdayBandAlignsWithGridAcrossDisplayModes() throws {
+        let view = try make()
+        XCTAssertEqual(view.appearance.weekdayHeight, 18)
+        for mode: CalendarDisplayMode in [.month(.horizontal), .week, .continuousMonths] {
+            try view.setDisplayMode(mode, animated: false)
+            view.frame.size.height = view.preferredHeight
+            view.layoutIfNeeded()
+            XCTAssertEqual(view.weekdayStack.frame.height,
+                           max(18, view.resolvedAppearance.weekdayFont.lineHeight + 4), accuracy: 0.001)
+            XCTAssertEqual(view.clipView.frame.minY, view.weekdayStack.frame.maxY, accuracy: 0.001)
+        }
+    }
+    @MainActor func testWeekdayHeightFallbackAndCustomHeight() throws {
+        let view = try make()
+        for invalid: CGFloat in [.nan, .infinity, -.infinity] {
+            var appearance = view.appearance
+            appearance.weekdayHeight = invalid
+            view.appearance = appearance
+            XCTAssertEqual(view.resolvedAppearance.weekdayHeight, 18)
+        }
+        var appearance = view.appearance
+        appearance.weekdayHeight = 40
+        view.appearance = appearance
+        view.layoutIfNeeded()
+        XCTAssertEqual(view.weekdayStack.frame.height, max(40, view.resolvedAppearance.weekdayFont.lineHeight + 4), accuracy: 0.001)
+    }
     @MainActor func testDynamicTypeIncreasesFontAndPreferredHeight() throws {
         let view = try make()
         let parent = UIViewController(), child = UIViewController()
@@ -917,6 +943,8 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertEqual(view.traitCollection.preferredContentSizeCategory, .accessibilityExtraExtraExtraLarge)
         XCTAssertGreaterThan(view.resolvedAppearance.titleFont.pointSize, fontSize)
         XCTAssertGreaterThan(view.preferredHeight, before)
+        XCTAssertGreaterThan(view.effectiveWeekdayHeight, 18)
+        XCTAssertGreaterThanOrEqual(view.weekdayStack.frame.height, view.resolvedAppearance.weekdayFont.lineHeight + 4)
         XCTAssertEqual(spy.heights.last, view.preferredHeight)
         XCTAssertGreaterThan(spy.heights.count, 1)
         XCTAssertEqual((view.weekdayStack.arrangedSubviews.first as? UILabel)?.accessibilityLabel, "Sunday")

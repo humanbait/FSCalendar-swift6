@@ -26,7 +26,7 @@ public typealias DayState = FSCalendarCore.DayState
     public var weekdayFont: UIFont = .preferredFont(forTextStyle: .caption1)
     public var rowHeight: CGFloat = 44
     public var headerHeight: CGFloat = 44
-    public var weekdayHeight: CGFloat = 26
+    public var weekdayHeight: CGFloat = 18
     public init() {}
 
     // Resolve preferred fonts against the calendar's traits, including container overrides.
@@ -43,7 +43,7 @@ public typealias DayState = FSCalendarCore.DayState
         copy.headerFont = font(headerFont); copy.weekdayFont = font(weekdayFont)
         copy.rowHeight = dimension(rowHeight, fallback: 44)
         copy.headerHeight = dimension(headerHeight, fallback: 44)
-        copy.weekdayHeight = dimension(weekdayHeight, fallback: 26)
+        copy.weekdayHeight = dimension(weekdayHeight, fallback: 18)
         return copy
     }
 }

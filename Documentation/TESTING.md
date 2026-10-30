@@ -237,3 +237,26 @@ reverse in place, and resize cancellation restores fractional scrolling.
 See [Mac validation](MACOS-VALIDATION.md#continuousweek-scope-animation--2026-09-29)
 for the quarter-step geometry checks, real animation/reversal coverage, native capture
 evidence and platform limitations. Existing paged transitions remain covered.
+
+## UIKit weekday spacing — 2026-10-31
+
+The UIKit default weekday band and nonfinite-value fallback are now 18 points.
+The existing font-line-height minimum remains in force for Dynamic Type.
+
+Validation command:
+
+```sh
+./Scripts/test-device.sh 00008030-000948522284802E weekday-spacing -collect-test-diagnostics never -only-testing:CalendarShowcaseTests/CalendarViewTests -only-testing:CalendarShowcaseUITests/CalendarShowcaseUITests/testSharedScenarioMatrix
+```
+
+All 39 UIKit contract tests passed on iPhone 11 / iOS 17.7.2, including default,
+custom and invalid weekday heights, large text, grid alignment, and existing
+transition coverage. The UI matrix failed before exercising screens with
+`Lost connection to testmanagerd`; the overall device run is therefore failed.
+Evidence is retained in `artifacts/weekday-spacing-20261030T164749712371Z/`.
+
+As a visual fallback, the showcase built and ran on iPhone 16 / iOS 18.2 Simulator.
+Month, week, continuous months, and large text were inspected with readable weekday
+labels and no weekday/day overlap. Screenshots are retained in
+`artifacts/weekday-spacing-simulator/{month,week,continuous,largeText}.png`.
+This visual check does not replace the incomplete physical-device UI matrix.
