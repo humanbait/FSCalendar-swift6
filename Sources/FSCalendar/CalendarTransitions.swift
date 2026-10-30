@@ -164,8 +164,9 @@ extension FSCalendar {
             for cell in collectionView.visibleCells {
                 if let index = collectionView.indexPath(for: cell) { applyTransitionOpacity(to: cell, at: index) }
             }
-            for separator in collectionView.subviews.compactMap({ $0 as? MonthSeparatorView }) {
-                separator.alpha = context.monthProgress
+            // Both rules and month fills share the scope animation.
+            for decoration in collectionView.subviews.compactMap({ $0 as? MonthSeparatorView }) {
+                decoration.alpha = context.monthProgress
             }
         }
     }

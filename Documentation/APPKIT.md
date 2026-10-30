@@ -81,9 +81,12 @@ keyboard-focus outline. Set `userInterfaceLayoutDirection = .rightToLeft` for ex
 Paged trackpad input accumulates and snaps once scrolling settles. Continuous months use
 native NSScrollView scrolling and shared boundary weeks with no repeated dates. Weekday
 labels remain visible; the month/year heading is hidden without reserving its height.
-First days use localized short month names, and stepped lines separate months. Set
-`calendarAppearance.monthSeparatorColor` to customize the rules; explicit `DayContent.title`
-values override month names. Heavy day grids use an LRU cache
+First days use localized short month names, and rounded stepped lines separate months.
+Set `calendarAppearance.monthSeparatorColor` and `monthSeparatorCornerRadius` (default 8;
+zero for square bends) to customize the rules. Odd months use `backgroundColor`; even
+months use the adaptive neutral `alternatingMonthBackgroundColor`. Set the latter to
+`nil` for a uniform background. Both fills and rules follow scope animations and theme
+changes. Explicit `DayContent.title` values override month names. Heavy day grids use an LRU cache
 capped at nine pages; section frames/row counts stay lightweight. Day accessibility IDs
 contain the civil date, month position and page anchor, so placeholders are distinguishable.
 

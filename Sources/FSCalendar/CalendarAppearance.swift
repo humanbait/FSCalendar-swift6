@@ -19,6 +19,12 @@ public typealias DayState = FSCalendarCore.DayState
     public var headerColor: UIColor = .label
     /// Month boundaries in continuous mode.
     public var monthSeparatorColor: UIColor = .separator
+    /// Radius of the two bends in continuous-month boundaries. Zero restores square bends.
+    public var monthSeparatorCornerRadius: CGFloat = 8
+    /// Even-numbered months use this fill; odd months use `backgroundColor`. Nil disables alternation.
+    public var alternatingMonthBackgroundColor: UIColor? = UIColor { traits in
+        UIColor(white: traits.userInterfaceStyle == .dark ? 0.16 : 0.95, alpha: 1)
+    }
     public var backgroundColor: UIColor = .secondarySystemGroupedBackground
     public var titleFont: UIFont = .preferredFont(forTextStyle: .body)
     public var subtitleFont: UIFont = .preferredFont(forTextStyle: .caption2)
@@ -41,6 +47,7 @@ public typealias DayState = FSCalendarCore.DayState
         var copy = self
         copy.titleFont = font(titleFont); copy.subtitleFont = font(subtitleFont)
         copy.headerFont = font(headerFont); copy.weekdayFont = font(weekdayFont)
+        copy.monthSeparatorCornerRadius = dimension(monthSeparatorCornerRadius, fallback: 8)
         copy.rowHeight = dimension(rowHeight, fallback: 44)
         copy.headerHeight = dimension(headerHeight, fallback: 44)
         copy.weekdayHeight = dimension(weekdayHeight, fallback: 18)

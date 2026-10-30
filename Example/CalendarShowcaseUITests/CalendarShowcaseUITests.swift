@@ -44,8 +44,10 @@ final class CalendarShowcaseUITests: XCTestCase {
     }
 
     @MainActor func testConnectedRangeCombinedUsage() {
-        XCTContext.runActivity(named: "Connected range, continuous months, and button scope") { _ in
-            exerciseConnectedRangeBands()
+        for style in ["light", "dark"] {
+            XCTContext.runActivity(named: "Connected range, continuous months, and button scope: \(style)") { _ in
+                exerciseConnectedRangeBands(interfaceStyle: style)
+            }
         }
     }
 
@@ -78,9 +80,10 @@ final class CalendarShowcaseUITests: XCTestCase {
         }
     }
 
-    @MainActor private func launch(_ scenario: String) -> XCUIApplication {
+    @MainActor private func launch(_ scenario: String, interfaceStyle: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--scenario", scenario]
+        app.launchEnvironment["FSCALENDAR_TEST_APPEARANCE"] = interfaceStyle
         app.launch()
         XCTAssertTrue(app.staticTexts["page-state"].waitForExistence(timeout: 10))
         return app
@@ -150,10 +153,21 @@ final class CalendarShowcaseUITests: XCTestCase {
         start.press(forDuration: 0.9, thenDragTo: end)
         wait(app.staticTexts["selection-state"], contains: "2024-02-15")
     }
-    @MainActor private func exerciseConnectedRangeBands() {
-        let app = launch("connectedRange")
+    @MainActor private func exerciseConnectedRangeBands(interfaceStyle: String) {
+        let app = launch("connectedRange", interfaceStyle: interfaceStyle)
         let state = app.staticTexts["selection-state"]
         let page = app.staticTexts["page-state"]
+        func captureMonths(_ selection: String) {
+            app.buttons["next"].tap()
+            wait(page, contains: "2024-03")
+            XCTAssertTrue(day(app, "2024-04-01").isHittable)
+            let image = XCTAttachment(screenshot: app.screenshot())
+            image.name = "swift-rounded-months-\(selection)-\(interfaceStyle)"
+            image.lifetime = .keepAlways; add(image)
+            app.buttons["previous"].tap()
+            wait(page, contains: "2024-02")
+        }
+        captureMonths("unselected")
         day(app, "2024-02-16").tap()
         day(app, "2024-02-20").tap()
         wait(state, contains: "2024-02-18") // The selected band crosses the week boundary.
@@ -174,9 +188,10 @@ final class CalendarShowcaseUITests: XCTestCase {
         XCTAssertEqual(february.frame.minY, march.frame.minY, accuracy: 1)
         XCTAssertEqual(february.frame.maxX, march.frame.minX, accuracy: 1)
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "\(implementation)-connected-range-continuous"
+        shot.name = "\(implementation)-connected-range-continuous-\(interfaceStyle)"
         shot.lifetime = .keepAlways
         add(shot)
+        captureMonths("selected")
         let beforeScroll = page.label
         app.collectionViews["calendar-grid"].swipeUp()
         let scrolled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", beforeScroll), object: page)
@@ -191,7 +206,7 @@ final class CalendarShowcaseUITests: XCTestCase {
         wait(page, contains: "month")
         XCTAssertTrue(state.label.contains("2024-02-21"))
         let roundTrip = XCTAttachment(screenshot: app.screenshot())
-        roundTrip.name = "\(implementation)-connected-range-scope-round-trip"
+        roundTrip.name = "\(implementation)-connected-range-scope-round-trip-\(interfaceStyle)"
         roundTrip.lifetime = .keepAlways
         add(roundTrip)
     }

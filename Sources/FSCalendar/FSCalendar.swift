@@ -267,6 +267,9 @@ import FSCalendarCore
         calendarLayout.mode = mode
         calendarLayout.rowHeight = effectiveRowHeight
         calendarLayout.monthSeparatorColor = appearance.monthSeparatorColor
+        calendarLayout.monthSeparatorCornerRadius = resolvedAppearance.monthSeparatorCornerRadius
+        calendarLayout.monthBackgroundColor = resolvedAppearance.backgroundColor
+        calendarLayout.alternatingMonthBackgroundColor = resolvedAppearance.alternatingMonthBackgroundColor
         calendarLayout.continuousSections = mode.isContinuous ? engine.continuousMonthSections() : []
         calendarLayout.rows = (0..<engine.pageCount(scope: mode.scope)).map { index in
             guard let id = try? engine.page(at: index, scope: mode.scope) else { return 0 }

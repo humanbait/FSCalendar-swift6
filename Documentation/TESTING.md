@@ -260,3 +260,42 @@ Month, week, continuous months, and large text were inspected with readable week
 labels and no weekday/day overlap. Screenshots are retained in
 `artifacts/weekday-spacing-simulator/{month,week,continuous,largeText}.png`.
 This visual check does not replace the incomplete physical-device UI matrix.
+
+## Rounded month boundaries and alternating fills — 2026-10-31
+
+Continuous-month calendars on UIKit and AppKit now use 8-point rounded separator
+bends and alternating neutral month backgrounds. Both are customizable through
+`monthSeparatorCornerRadius` and `alternatingMonthBackgroundColor`. Fills share the
+separator geometry and animate with the existing scope transition.
+
+Validated with Xcode 27.2 (27B48), Swift 6.4.2 in Swift 6 mode, macOS 27.0.1 arm64,
+a physical iPhone 11 on iOS 17.7.2, and an iPhone 16 simulator on iOS 18.2:
+
+| Check | Result | Evidence under ignored `artifacts/` |
+| --- | --- | --- |
+| `swift test -Xswiftc -warnings-as-errors` | 45 passed | `rounded-months/package.log` |
+| Full `test-macos.sh --destination 'platform=macOS,arch=arm64'` | 43 hosted/UI tests passed, plus 45 package tests | `rounded-months-20261030T172913Z/` |
+| Physical iPhone hosted suite | 71 passed; subsequent UI runner disconnected | `rounded-months-ios-20261030T172914783282Z/` |
+| Isolated physical iPhone connected-range UI retry | Failed before UI actions: `Lost connection to testmanagerd` | `rounded-months-ios-ui-20261030T173123966776Z/` |
+| iOS 18.2 simulator connected-range UI flow | Passed, including light and dark activities | `rounded-months/SimulatorTests.xcresult` |
+
+The two physical-device runs remain failed runs; hosted success does not establish a
+physical-device UI pass. Simulator validation covers the UI flow without changing or
+relaxing its assertions. The showcase's `FSCALENDAR_TEST_APPEARANCE` environment setting
+now supports UIKit as well as AppKit, allowing theme-specific UI captures without
+changing the device's global appearance.
+
+Regression assertions cover all seven first weekdays, fractional dimensions, 1x/2x/3x
+stroke alignment, rounded and square paths, radius normalization, RTL, December–January
+color parity, changed range starts, fill ownership without gaps or overlap, empty outer
+slots, customization and opt-out, decoration copying/reuse, input/accessibility isolation,
+and continuous/week opacity and reversal cleanup. Existing selection, events, keyboard,
+scrolling, resizing, Reduce Motion, and transition suites pass.
+
+Inspected native Mac UI and simulator light/dark screenshots show February–April both
+unselected and selected across February 29–March 1. Physical iPhone hosted captures also
+verify light/dark rendering and connected bands. Descriptive copies are in
+`rounded-months/{appkit,swift}-rounded-months-{unselected,selected}-{light,dark}.png`.
+The project was regenerated for the new UIKit geometry source; unrelated generated
+scheme formatting was discarded. Exact Swift 6.2, iOS 16, macOS 13, manual VoiceOver,
+and a successful physical-device UI run remain separate validation gaps.

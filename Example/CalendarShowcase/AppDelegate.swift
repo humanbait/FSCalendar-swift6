@@ -7,6 +7,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         let window = UIWindow(frame: UIScreen.main.bounds)
+        // Keep UI-test captures independent of the device's current appearance.
+        switch ProcessInfo.processInfo.environment["FSCALENDAR_TEST_APPEARANCE"] {
+        case "light": window.overrideUserInterfaceStyle = .light
+        case "dark": window.overrideUserInterfaceStyle = .dark
+        default: break
+        }
         let arguments = ProcessInfo.processInfo.arguments
         func argument(_ name: String) -> String? {
             guard let i = arguments.firstIndex(of: name), arguments.indices.contains(i + 1) else { return nil }

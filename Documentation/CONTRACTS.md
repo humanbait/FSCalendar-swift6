@@ -37,12 +37,25 @@ configuration locale refreshes the month names.
 
 A one-physical-pixel separator follows each internal month boundary: below the previous
 month's cells, beside the first new-month cell, and above the remaining cells in the row.
+The two bends use an 8-point radius, clamped to the available horizontal runs and half
+of the row height. Set `FSCalendarAppearance.monthSeparatorCornerRadius` to zero for
+square bends. Negative radii resolve to zero; nonfinite values resolve to the default.
 Months starting in the first weekday column get a straight line above that row. No rule
 is drawn before the first displayed month or after the last. Layout decorations draw
 above selection backgrounds without intercepting input or exposing accessibility elements,
 including for custom cells. `FSCalendarAppearance.monthSeparatorColor` defaults to the
 platform's semantic separator color. Geometry mirrors in RTL and follows resizing and
 display scale; colors follow appearance changes.
+
+Month backgrounds follow the same rounded boundary paths beneath date cells and selections.
+Odd-numbered months use `backgroundColor`; even-numbered months use
+`alternatingMonthBackgroundColor`, an adaptive neutral gray (0.95 white in light appearance,
+0.16 in dark appearance). Set the latter to `nil` to use `backgroundColor` throughout.
+Month parity is independent of the configured range and remains stable across year changes.
+Outer empty weekday slots and trailing scroll space retain the calendar background.
+Both fills and rules fade with continuous/week scope transitions; neither decoration
+intercepts input or adds accessibility elements. Custom cells with opaque backgrounds
+can cover the month fill. Paged month and week modes do not create these decorations.
 
 `currentPage` identifies the latest month whose first week has reached the viewport top,
 including a partially visible boundary week. `setCurrentPage` and month navigation align

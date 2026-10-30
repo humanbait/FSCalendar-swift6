@@ -9,6 +9,9 @@ import FSCalendarCore
     var continuousSections: [ContinuousMonthSection] = [] { didSet { invalidateGeometry() } }
     var isRTL = false { didSet { if oldValue != isRTL { invalidateGeometry() } } }
     var monthSeparatorColor: UIColor = .separator { didSet { invalidateLayout() } }
+    var monthSeparatorCornerRadius: CGFloat = 8 { didSet { invalidateLayout() } }
+    var monthBackgroundColor: UIColor = FSCalendarAppearance().backgroundColor { didSet { invalidateLayout() } }
+    var alternatingMonthBackgroundColor: UIColor? = FSCalendarAppearance().alternatingMonthBackgroundColor { didSet { invalidateLayout() } }
     private var frames: [CGRect] = []
     private var size: CGSize = .zero
     private var preparedSize: CGSize = .zero
@@ -17,10 +20,12 @@ import FSCalendarCore
     override init() {
         super.init()
         register(MonthSeparatorView.self, forDecorationViewOfKind: MonthSeparatorView.kind)
+        register(MonthSeparatorView.self, forDecorationViewOfKind: MonthSeparatorView.backgroundKind)
     }
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         register(MonthSeparatorView.self, forDecorationViewOfKind: MonthSeparatorView.kind)
+        register(MonthSeparatorView.self, forDecorationViewOfKind: MonthSeparatorView.backgroundKind)
     }
 
     private func invalidateGeometry() { geometryIsDirty = true; invalidateLayout() }
@@ -94,6 +99,10 @@ import FSCalendarCore
         }
         var attributes: [UICollectionViewLayoutAttributes] = []
         for section in sections {
+            if mode.isContinuous, let background = layoutAttributesForDecorationView(ofKind: MonthSeparatorView.backgroundKind,
+                at: IndexPath(item: 0, section: section)), background.frame.intersects(rect) {
+                attributes.append(background)
+            }
             for item in 0..<itemCount(in: section) {
                 if let a = layoutAttributesForItem(at: IndexPath(item: item, section: section)), a.frame.intersects(rect) {
                     attributes.append(a)
@@ -128,35 +137,35 @@ import FSCalendarCore
     }
     override func layoutAttributesForDecorationView(ofKind elementKind: String, at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
         prepare()
-        guard mode.isContinuous, preparedSize.width > 0, elementKind == MonthSeparatorView.kind, indexPath.item == 0,
-              indexPath.section > 0, continuousSections.indices.contains(indexPath.section) else { return nil }
+        let isBackground = elementKind == MonthSeparatorView.backgroundKind
+        guard mode.isContinuous, preparedSize.width > 0, rowHeight > 0, indexPath.item == 0,
+              isBackground || elementKind == MonthSeparatorView.kind,
+              continuousSections.indices.contains(indexPath.section),
+              isBackground || indexPath.section > 0 else { return nil }
         let section = continuousSections[indexPath.section]
-        let scale = max(1, collectionView?.traitCollection.displayScale ?? 1), pixel = 1 / scale
-        func aligned(_ value: CGFloat) -> CGFloat { (value * scale).rounded() / scale }
-        let width = aligned(preparedSize.width)
-        let top = aligned(CGFloat(section.firstRow) * rowHeight)
-        let bottom = aligned(CGFloat(section.firstRow + 1) * rowHeight)
-        let column = section.startSlot % 7
-        let attributes = MonthSeparatorAttributes(forDecorationViewOfKind: elementKind, with: indexPath)
-        attributes.frame = CGRect(x: 0, y: top, width: width, height: column == 0 ? pixel : bottom - top + pixel)
-        if column == 0 {
-            attributes.segments = [CGRect(x: 0, y: 0, width: width, height: pixel)]
-        } else {
-            let boundary = aligned(CGFloat(column) * preparedSize.width / 7)
-            // Disjoint rectangles avoid darkening translucent colors at the two joins.
-            attributes.segments = [
-                CGRect(x: 0, y: bottom - top, width: boundary, height: pixel),
-                CGRect(x: boundary, y: 0, width: pixel, height: bottom - top + pixel),
-                CGRect(x: boundary + pixel, y: 0, width: max(0, width - boundary - pixel), height: pixel)
-            ]
-            if isRTL {
-                attributes.segments = attributes.segments.map {
-                    CGRect(x: width - $0.maxX, y: $0.minY, width: $0.width, height: $0.height)
-                }
-            }
+        let scale = max(1, collectionView?.traitCollection.displayScale ?? 1)
+        let width = (preparedSize.width * scale).rounded() / scale
+        func boundary(_ slot: Int, internalBoundary: Bool) -> MonthBoundaryGeometry {
+            MonthBoundaryGeometry(slot: slot, width: width, rowHeight: rowHeight, scale: scale,
+                                  cornerRadius: monthSeparatorCornerRadius, internalBoundary: internalBoundary)
         }
-        attributes.color = monthSeparatorColor
-        attributes.zIndex = 10
+        let top = boundary(section.startSlot, internalBoundary: indexPath.section > 0)
+        let attributes = MonthSeparatorAttributes(forDecorationViewOfKind: elementKind, with: indexPath)
+        let geometry: MonthDecorationGeometry
+        if isBackground {
+            let bottom = boundary(section.startSlot + section.dayCount,
+                                  internalBoundary: indexPath.section + 1 < continuousSections.count)
+            geometry = MonthDecorationGeometry(top: top, bottom: bottom, width: width, isRTL: isRTL)
+            attributes.color = section.page.anchor.month.isMultiple(of: 2)
+                ? (alternatingMonthBackgroundColor ?? monthBackgroundColor) : monthBackgroundColor
+            attributes.zIndex = -1
+        } else {
+            geometry = MonthDecorationGeometry(boundary: top, width: width, scale: scale, isRTL: isRTL)
+            attributes.lineWidth = 1 / scale
+            attributes.color = monthSeparatorColor
+            attributes.zIndex = 10
+        }
+        attributes.frame = geometry.frame; attributes.path = geometry.path
         return attributes
     }
     func itemCount(in section: Int) -> Int {

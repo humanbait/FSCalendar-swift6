@@ -99,6 +99,15 @@ final class MacUITests: XCTestCase {
             expectation(for: NSPredicate(format: "value CONTAINS %@", date), evaluatedWith: readout)
             waitForExpectations(timeout: 5)
         }
+        func captureMonths(_ selection: String) {
+            app.buttons["next"].click(); waitFor("2024-03-01")
+            XCTAssertTrue(app.buttons["day.2024-04-01.1.2024-04-01"].isHittable)
+            let image = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            image.name = "appkit-rounded-months-\(selection)-\(interfaceStyle.lowercased())"
+            image.lifetime = .keepAlways; add(image)
+            app.buttons["previous"].click(); waitFor("2024-02-01")
+        }
+        captureMonths("unselected")
         click("2024-02-16"); click("2024-02-20")
         waitFor("2024-02-18")
         let heightComparison = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -123,6 +132,7 @@ final class MacUITests: XCTestCase {
         image.name = "appkit-connected-range-continuous-\(interfaceStyle.lowercased())"
         image.lifetime = .keepAlways
         add(image)
+        captureMonths("selected")
         let beforeScroll = readout.value as? String ?? ""
         app.scrollViews["calendar.scroll"].scroll(byDeltaX: 0, deltaY: -400)
         expectation(for: NSPredicate(format: "value != %@", beforeScroll), evaluatedWith: readout)

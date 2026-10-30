@@ -38,6 +38,7 @@ extension FSCalendar: RendererSelectionContract {}
 
 final class CalendarViewTests: XCTestCase {
     @MainActor func testMonthSeparatorGeometryMirroringAndDecorationLifecycle() throws {
+
         for weekday in 1...7 {
             let engine = try CalendarEngine(configuration: CalendarConfiguration(firstWeekday: weekday,
                 minimumDate: CivilDay(year: 2023, month: 12, day: 15),
@@ -50,7 +51,7 @@ final class CalendarViewTests: XCTestCase {
                 let collection = UICollectionView(frame: CGRect(x: 0, y: 0, width: width, height: 400), collectionViewLayout: layout)
                 let scale = max(1, collection.traitCollection.displayScale)
                 let kind = MonthSeparatorView.kind
-                func separator(_ section: Int) throws -> MonthSeparatorAttributes {
+                func decoration(_ kind: String, _ section: Int) throws -> MonthSeparatorAttributes {
                     try XCTUnwrap(layout.layoutAttributesForDecorationView(ofKind: kind,
                         at: IndexPath(item: 0, section: section)) as? MonthSeparatorAttributes)
                 }
@@ -58,51 +59,156 @@ final class CalendarViewTests: XCTestCase {
                 XCTAssertNil(layout.layoutAttributesForDecorationView(ofKind: kind, at: IndexPath(item: 0, section: 4)))
                 for section in 1..<layout.continuousSections.count {
                     layout.isRTL = false
-                    let a = try separator(section)
+                    let a = try decoration(kind, section)
+                    let path = try XCTUnwrap(a.path)
                     let column = layout.continuousSections[section].startSlot % 7
-                    XCTAssertEqual(a.segments.count, column == 0 ? 1 : 3)
+                    var curves = 0
+                    path.applyWithBlock { if $0.pointee.type == .addCurveToPoint { curves += 1 } }
+                    XCTAssertEqual(curves, column == 0 ? 0 : 2)
                     XCTAssertGreaterThan(a.zIndex, 0)
+                    XCTAssertEqual(a.lineWidth, 1 / scale)
                     let first = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: 0, section: section)))
                     XCTAssertEqual(a.frame.minY, first.frame.minY, accuracy: 0.5 / scale)
-                    XCTAssertEqual(a.segments.last?.maxX, a.frame.width)
-                    XCTAssertEqual(a.segments.last?.minY, 0)
-                    if column != 0 {
-                        XCTAssertEqual(a.segments[1].minX, first.frame.minX, accuracy: 0.5 / scale)
-                        XCTAssertEqual(a.frame.minY + a.segments[0].minY, first.frame.maxY, accuracy: 0.5 / scale)
-                    }
-                    for segment in a.segments {
-                        XCTAssertEqual(min(segment.width, segment.height), 1 / scale, accuracy: 0.00001)
-                        let global = segment.offsetBy(dx: a.frame.minX, dy: a.frame.minY)
-                        for value in [global.minX, global.minY, global.width, global.height] {
-                            XCTAssertEqual(value * scale, (value * scale).rounded(), accuracy: 0.00001)
-                        }
-                        let visible = (layout.layoutAttributesForElements(in: global) ?? [])
-                        XCTAssertTrue(visible.contains { $0.representedElementKind == kind && $0.indexPath.section == section })
-                    }
+                    XCTAssertEqual(path.boundingBoxOfPath.width, a.frame.width, accuracy: 0.00001)
+                    XCTAssertEqual(path.boundingBoxOfPath.minY, 0.5 / scale, accuracy: 0.00001)
+                    let visible = (layout.layoutAttributesForElements(in: a.frame) ?? [])
+                    XCTAssertTrue(visible.contains { $0.representedElementKind == kind && $0.indexPath.section == section })
                     let copy = try XCTUnwrap(a.copy() as? MonthSeparatorAttributes)
                     XCTAssertTrue(a.isEqual(copy))
-                    copy.color = .red
+                    copy.lineWidth *= 2
+                    XCTAssertFalse(a.isEqual(copy))
+                    copy.lineWidth = a.lineWidth; copy.color = .red
+                    XCTAssertFalse(a.isEqual(copy))
+                    copy.color = a.color; copy.path = nil
                     XCTAssertFalse(a.isEqual(copy))
                     layout.isRTL = true
-                    let mirrored = try separator(section)
-                    for (left, right) in zip(a.segments, mirrored.segments) {
-                        XCTAssertEqual(left.minX, a.frame.width - right.maxX, accuracy: 0.00001)
-                        XCTAssertEqual(left.minY, right.minY)
-                    }
+                    let mirrored = try decoration(kind, section)
+                    var mirror = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: a.frame.width, ty: 0)
+                    XCTAssertEqual(path.copy(using: &mirror), mirrored.path)
+                    layout.monthSeparatorCornerRadius = 0
+                    let square = try XCTUnwrap(decoration(kind, section).path)
+                    var squareCurves = 0
+                    square.applyWithBlock { if $0.pointee.type == .addCurveToPoint { squareCurves += 1 } }
+                    XCTAssertEqual(squareCurves, 0)
+                    layout.monthSeparatorCornerRadius = 8
                     layout.monthSeparatorColor = .red
-                    XCTAssertEqual(try separator(section).color, .red)
+                    XCTAssertEqual(try decoration(kind, section).color, .red)
                     layout.monthSeparatorColor = .separator
                 }
                 let all = (layout.layoutAttributesForElements(in: CGRect(origin: .zero, size: layout.collectionViewContentSize)) ?? [])
                 XCTAssertEqual(all.filter { $0.representedElementKind == kind }.count, 3)
-                let decoration = MonthSeparatorView(frame: .zero)
-                decoration.apply(try separator(1))
-                XCTAssertFalse(decoration.isUserInteractionEnabled)
-                XCTAssertFalse(decoration.isAccessibilityElement)
-                layout.mode = .week
-                XCTAssertNil(layout.layoutAttributesForDecorationView(ofKind: kind, at: IndexPath(item: 0, section: 1)))
+                XCTAssertEqual(all.filter { $0.representedElementKind == MonthSeparatorView.backgroundKind }.count, 4)
+                let view = MonthSeparatorView(frame: .zero)
+                for kind in [kind, MonthSeparatorView.backgroundKind] {
+                    view.apply(try decoration(kind, 1))
+                    XCTAssertFalse(view.isUserInteractionEnabled)
+                    XCTAssertFalse(view.isAccessibilityElement)
+                }
+                for mode: CalendarDisplayMode in [.week, .month(.horizontal), .month(.vertical)] {
+                    layout.mode = mode
+                    for kind in [kind, MonthSeparatorView.backgroundKind] {
+                        XCTAssertNil(layout.layoutAttributesForDecorationView(ofKind: kind, at: IndexPath(item: 0, section: 1)))
+                    }
+                }
             }
         }
+    }
+
+    @MainActor func testMonthBackgroundOwnershipParityAndCustomization() throws {
+
+        for weekday in 1...7 {
+            let engine = try CalendarEngine(configuration: CalendarConfiguration(firstWeekday: weekday,
+                minimumDate: CivilDay(year: 2023, month: 12, day: 15),
+                maximumDate: CivilDay(year: 2024, month: 3, day: 20)))
+            let layout = CalendarCollectionLayout()
+            layout.mode = .continuousMonths; layout.rowHeight = 45.4121
+            layout.continuousSections = engine.continuousMonthSections()
+            layout.rows = layout.continuousSections.map(\.rowCount)
+            layout.monthBackgroundColor = .white; layout.alternatingMonthBackgroundColor = .gray
+            let width: CGFloat = 350.3
+            let collection = UICollectionView(frame: CGRect(x: 0, y: 0, width: width, height: 400), collectionViewLayout: layout)
+            defer { withExtendedLifetime(collection) {} }
+            func backgrounds() throws -> [MonthSeparatorAttributes] {
+                try layout.continuousSections.indices.map { section in
+                    try XCTUnwrap(layout.layoutAttributesForDecorationView(ofKind: MonthSeparatorView.backgroundKind,
+                        at: IndexPath(item: 0, section: section)) as? MonthSeparatorAttributes)
+                }
+            }
+            func contains(_ attribute: MonthSeparatorAttributes, _ point: CGPoint) -> Bool {
+                attribute.path?.contains(CGPoint(x: point.x - attribute.frame.minX, y: point.y - attribute.frame.minY)) == true
+            }
+            for rtl in [false, true] {
+                layout.isRTL = rtl
+                let fills = try backgrounds()
+                for (section, fill) in fills.enumerated() {
+                    XCTAssertLessThan(fill.zIndex, 0)
+                    XCTAssertEqual(fill.lineWidth, 0)
+                    XCTAssertEqual(fill.color, section % 2 == 0 ? .gray : .white) // December is even.
+                    for item in 0..<layout.continuousSections[section].dayCount {
+                        let cell = try XCTUnwrap(layout.layoutAttributesForItem(at: IndexPath(item: item, section: section)))
+                        let center = CGPoint(x: cell.frame.midX, y: cell.frame.midY)
+                        XCTAssertTrue(contains(fill, center))
+                        XCTAssertEqual(fills.filter { contains($0, center) }.count, 1)
+                    }
+                }
+                // Shared rows are completely tiled, including the space around both rounded bends.
+                for section in layout.continuousSections.dropFirst() {
+                    let y = CGFloat(section.firstRow) * layout.rowHeight
+                    for dx in stride(from: CGFloat(0.137), to: width - 1, by: 3.7) {
+                        for dy in stride(from: CGFloat(0.137), to: layout.rowHeight, by: 2.3) {
+                            XCTAssertEqual(fills.filter { contains($0, CGPoint(x: dx, y: y + dy)) }.count, 1)
+                        }
+                    }
+                }
+                let first = layout.continuousSections[0]
+                let last = try XCTUnwrap(layout.continuousSections.last)
+                let end = last.startSlot + last.dayCount
+                for slot in Array(0..<first.startSlot) + Array(end..<(end / 7 + 1) * 7) {
+                    let column = rtl ? 6 - slot % 7 : slot % 7
+                    let center = CGPoint(x: (CGFloat(column) + 0.5) * width / 7,
+                                         y: (CGFloat(slot / 7) + 0.5) * layout.rowHeight)
+                    XCTAssertFalse(fills.contains { contains($0, center) })
+                }
+            }
+            // Shifting the configured start month must not recolor January, February or March.
+            let shifted = try CalendarEngine(configuration: CalendarConfiguration(firstWeekday: weekday,
+                minimumDate: CivilDay(year: 2024, month: 1, day: 1),
+                maximumDate: CivilDay(year: 2024, month: 3, day: 20)))
+            layout.continuousSections = shifted.continuousMonthSections()
+            XCTAssertEqual(try backgrounds().map(\.color), [.white, .gray, .white])
+            layout.alternatingMonthBackgroundColor = .red
+            XCTAssertEqual(try backgrounds()[1].color, .red)
+            layout.alternatingMonthBackgroundColor = nil
+            XCTAssertTrue(try backgrounds().allSatisfy { $0.color == .white })
+            layout.monthBackgroundColor = .blue
+            XCTAssertTrue(try backgrounds().allSatisfy { $0.color == .blue })
+        }
+    }
+
+    @MainActor func testMonthCornerClampingAndPixelAlignment() throws {
+        for scale: CGFloat in [1, 2, 3] {
+            for column in 0...6 {
+                let boundary = MonthBoundaryGeometry(slot: 7 + column, width: 70, rowHeight: 9.375,
+                    scale: scale, cornerRadius: 1000)
+                XCTAssertGreaterThanOrEqual(boundary.radius, 0)
+                XCTAssertLessThanOrEqual(boundary.radius, 5)
+                let geometry = MonthDecorationGeometry(boundary: boundary, width: 70, scale: scale, isRTL: false)
+                XCTAssertEqual(geometry.frame.minY * scale, (geometry.frame.minY * scale).rounded(), accuracy: 0.00001)
+                XCTAssertEqual(geometry.frame.maxY * scale, (geometry.frame.maxY * scale).rounded(), accuracy: 0.00001)
+                XCTAssertTrue(geometry.path.boundingBoxOfPath.width.isFinite)
+            }
+        }
+        var appearance = FSCalendarAppearance()
+        for (input, expected): (CGFloat, CGFloat) in [(-1, 0), (.nan, 8), (.infinity, 8), (0, 0), (8, 8)] {
+            appearance.monthSeparatorCornerRadius = input
+            XCTAssertEqual(appearance.resolved(for: UITraitCollection()).monthSeparatorCornerRadius, expected)
+        }
+        let alternate = try XCTUnwrap(appearance.alternatingMonthBackgroundColor)
+        let light = alternate.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        let dark = alternate.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+        XCTAssertNotEqual(light, dark)
+        XCTAssertNotEqual(light, appearance.backgroundColor.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light)))
+        XCTAssertNotEqual(dark, appearance.backgroundColor.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)))
     }
     @MainActor func testContinuousMonthLabelsLocaleCustomTitlesAndReuse() throws {
 
@@ -424,6 +530,9 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertEqual(try cell(boundary[1]).convert(cell(boundary[1]).bounds, to: view).minY, originalY, accuracy: pixel)
         for progress: CGFloat in [0, 0.25, 0.5, 0.75, 1] {
             view.updateInteractiveTransition(progress: progress)
+            let decorations = view.collectionView.subviews.compactMap { $0 as? MonthSeparatorView }
+            XCTAssertFalse(decorations.isEmpty)
+            XCTAssertTrue(decorations.allSatisfy { abs($0.alpha - context.monthProgress) < 0.001 })
             XCTAssertEqual(view.bounds.height, 400 + (context.targetHeight - 400) * progress, accuracy: pixel)
             for day in boundary {
                 XCTAssertEqual(try cell(day).alpha, 1)
@@ -476,6 +585,7 @@ final class CalendarViewTests: XCTestCase {
         XCTAssertEqual(view.bounds.height, 400, accuracy: 0.5)
         XCTAssertEqual(view.collectionView.transform, .identity)
         XCTAssertTrue(view.collectionView.isScrollEnabled)
+        XCTAssertTrue(view.collectionView.subviews.compactMap { $0 as? MonthSeparatorView }.allSatisfy { $0.alpha == 1 })
         XCTAssertTrue(context.titleFades.allSatisfy { $0.outgoing.superview == nil && $0.label.alpha == 1 })
     }
 

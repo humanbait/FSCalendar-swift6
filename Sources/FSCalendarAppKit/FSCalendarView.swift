@@ -239,6 +239,9 @@ import FSCalendarCore
         input.cancelScroll()
         shortMonthSymbols = formatter("LLL").shortStandaloneMonthSymbols
         calendarLayout.monthSeparatorColor = metrics.monthSeparatorColor
+        calendarLayout.monthSeparatorCornerRadius = metrics.monthSeparatorCornerRadius
+        calendarLayout.monthBackgroundColor = metrics.backgroundColor
+        calendarLayout.alternatingMonthBackgroundColor = metrics.alternatingMonthBackgroundColor
         calendarLayout.mode = renderingMode; calendarLayout.rowHeight = metrics.rowHeight
         calendarLayout.continuousSections = renderingMode.isContinuous ? engine.continuousMonthSections() : []
         calendarLayout.rows = (0..<engine.pageCount(scope: renderingMode.scope)).compactMap { try? engine.page(at: $0, scope: renderingMode.scope) }.map { rowCount($0.anchor, scope: renderingMode.scope, continuous: renderingMode.isContinuous) }

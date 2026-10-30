@@ -1,30 +1,33 @@
 #if canImport(UIKit)
 import UIKit
 
-/// Separate decoration attributes keep month rules independent of custom date cells.
+/// Separate decoration attributes keep month rules and fills independent of custom date cells.
 @MainActor final class MonthSeparatorAttributes: UICollectionViewLayoutAttributes {
-    var segments: [CGRect] = []
+    var path: CGPath?
+    var lineWidth: CGFloat = 0
     var color: UIColor = .separator
 
     override func copy(with zone: NSZone? = nil) -> Any {
         // Collection layouts copy and compare attributes on the UI thread.
         MainActor.assumeIsolated { () -> MonthSeparatorAttributes in
             let copy = super.copy(with: zone) as! MonthSeparatorAttributes
-            copy.segments = segments; copy.color = color
+            copy.path = path; copy.lineWidth = lineWidth; copy.color = color
             return copy
         }
     }
     override func isEqual(_ object: Any?) -> Bool {
         guard let other = object as? MonthSeparatorAttributes else { return false }
         return MainActor.assumeIsolated {
-            return segments == other.segments && color == other.color && super.isEqual(other)
+            return path == other.path && lineWidth == other.lineWidth && color == other.color && super.isEqual(other)
         }
     }
 }
 
 @MainActor final class MonthSeparatorView: UICollectionReusableView {
     static let kind = "FSCalendar.monthSeparator"
-    private var segments: [CGRect] = []
+    static let backgroundKind = "FSCalendar.monthBackground"
+    private var path: CGPath?
+    private var lineWidth: CGFloat = 0
     private var color: UIColor = .separator
 
     override init(frame: CGRect) {
@@ -36,14 +39,19 @@ import UIKit
     override func apply(_ layoutAttributes: UICollectionViewLayoutAttributes) {
         super.apply(layoutAttributes)
         guard let attributes = layoutAttributes as? MonthSeparatorAttributes else { return }
-        segments = attributes.segments; color = attributes.color; setNeedsDisplay()
+        path = attributes.path; lineWidth = attributes.lineWidth; color = attributes.color; setNeedsDisplay()
     }
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection); setNeedsDisplay()
     }
     override func draw(_ rect: CGRect) {
-        color.setFill()
-        for segment in segments { UIRectFill(segment) }
+        guard let path, let context = UIGraphicsGetCurrentContext() else { return }
+        context.addPath(path)
+        if lineWidth > 0 {
+            color.setStroke(); context.setLineWidth(lineWidth); context.strokePath()
+        } else {
+            color.setFill(); context.fillPath()
+        }
     }
 }
 #endif
