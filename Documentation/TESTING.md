@@ -34,6 +34,12 @@ Launch arguments: `--scenario SCENARIO`. Names: `month`, `vertical`, `week`, `co
 
 Fixtures: Gregorian, GMT, en_US_POSIX, initial/today 2024-02-14, bounds 2020-01-01...2030-12-31 (bounds scenario 2024-02-10...2024-03-20). Large Text uses a container content-size override. This does not change the phone's global text-size setting.
 
+On iOS, **Connected range** pins the controls, calendar, and state labels over a full-height agenda. The calendar background is clear; alternating months use black at 4% opacity in light appearance and white at 6% in dark appearance, with 8-point separator bends. `ConnectedRangeChromeView` registers a fixed sibling boundary with [`UIScrollEdgeElementContainerInteraction`](https://developer.apple.com/documentation/uikit/uiscrolledgeelementcontainerinteraction) and the agenda's hard top edge on iOS 26+, or supplies a regular blur on older versions. Calendar content stays outside vibrancy, and the effect hierarchy remains fully opaque. Transparent navigation appearances let this single surface extend beneath the navigation bar.
+
+The agenda's content and indicator insets follow the measured header height. Scope changes and resizing preserve `contentOffset.y + contentInset.top` within the existing layout animation. Hosted checks cover both material branches, tint resolution, resizing, Reduce Motion round trips, and intermediate animation frames. The light/dark connected-range UI test records February–April before/after agenda scrolling, with/without a cross-month selection, and verifies that agenda scrolling leaves the calendar page and selection unchanged before exercising calendar scrolling and scope changes. Launch with `--scenario connectedRange`; optionally set `FSCALENDAR_TEST_APPEARANCE` to `light` or `dark` for deterministic captures.
+
+The iOS showcase uses `SceneDelegate` to create its window and retains the same launch arguments and appearance override. This enables testing with the iOS 27 SDK/runtime, which [requires scene-based startup](https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle). The project generator includes the scene manifest; the library and Mac app are unaffected.
+
 ## Accessibility and release checks
 
 Automated labels/traits/description audits, RTL, Dynamic Type, and screenshots are distinct from hands-on VoiceOver and Reduce Motion observations. Record manual observations separately. An iOS 17 device pass does not establish iOS 16 runtime or exact Swift 6.2 compiler compatibility.
@@ -299,3 +305,43 @@ verify light/dark rendering and connected bands. Descriptive copies are in
 The project was regenerated for the new UIKit geometry source; unrelated generated
 scheme formatting was discarded. Exact Swift 6.2, iOS 16, macOS 13, manual VoiceOver,
 and a successful physical-device UI run remain separate validation gaps.
+
+## Translucent connected-range preview — 2026-10-31
+
+Only the iOS example changes appearance and layout. The same Xcode 27.2 / Swift 6.4.2
+toolchain validated the native material on iPhone 18 Pro / iOS 27.2 Simulator, regular
+blur on iPhone 16 / iOS 18.2 Simulator, and hosted behavior on iPhone 11 / iOS 17.7.2.
+All builds used `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
+
+| Check | Result | Evidence under ignored `artifacts/` |
+| --- | --- | --- |
+| iOS 27.2 `SharedDriverTests` | All 11 distinct tests passed across the initial and focused retry runs | `blur-months/NativeSceneTests.xcresult`, `blur-months/NativeFinalTests.xcresult` |
+| iOS 27.2 `testConnectedRangeCombinedUsage` | Passed, including light and dark activities | `blur-months/NativeUITests.xcresult` |
+| iOS 18.2 same hosted and UI filters | 12 passed | `blur-months/FallbackTests.xcresult` |
+| Physical iPhone `SharedDriverTests` | 11 passed | `blur-months-ios-20261030T181041782412Z/` |
+| Physical iPhone final chrome/inset/resize check | 1 passed | `blur-months-ios-resize-20261030T181907936817Z/` |
+
+Simulator runs select `CalendarShowcaseTests/SharedDriverTests` and
+`CalendarShowcaseUITests/CalendarShowcaseUITests/testConnectedRangeCombinedUsage`, with
+parallel testing disabled. Physical runs use `Scripts/test-device.sh` with the same
+hosted filter and `-collect-test-diagnostics never`.
+
+Earlier native runs remain retained failed runs. `NativeTests.xcresult` exposed the
+old app lifecycle being rejected at startup; adopting scenes fixed it. The subsequent
+runs exposed an exact floating-point size comparison and UI queries that assumed
+virtualized cells had finite frames and nonempty cell labels. The final checks use a
+size tolerance and the exposed row's text. All affected checks passed on retry; the
+earlier failed bundles are not reported as passing suites.
+
+Sixteen full-screen February–April captures are retained in `blur-months/native/` and
+`blur-months/fallback/`, named
+`swift-blur-months-{unselected,selected}-{light,dark}-{before-scroll,after-scroll}.png`.
+Visual review confirms colored agenda icons blur beneath the pinned calendar while
+rounded translucent month fills, connected selections, and event dots remain distinct.
+Hosted presentation-frame checks verify that header height and agenda offset animate
+together; resize and Reduce Motion checks preserve the same logical agenda position.
+The project was regenerated for the chrome helper and scene manifest.
+
+No test-service failure occurred in the final simulator or physical hosted checks.
+Physical UI automation was not rerun; its previously recorded `testmanagerd` gap remains.
+Package and macOS tests were not repeated because their sources and behavior are unchanged.

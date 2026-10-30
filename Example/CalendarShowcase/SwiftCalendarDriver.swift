@@ -44,6 +44,15 @@ import FSCalendarCore
         if [.custom, .range].contains(scenario) { try! calendar.register(DemoSwiftCell.self, forCellReuseIdentifier: "custom") }
         if scenario == .connectedRange {
             try! calendar.register(ConnectedRangeSwiftCell.self, forCellReuseIdentifier: "connected")
+            var appearance = calendar.appearance
+            appearance.backgroundColor = .clear
+            appearance.alternatingMonthBackgroundColor = UIColor { traits in
+                traits.userInterfaceStyle == .dark
+                    ? UIColor.white.withAlphaComponent(0.06)
+                    : UIColor.black.withAlphaComponent(0.04)
+            }
+            appearance.monthSeparatorCornerRadius = 8
+            calendar.appearance = appearance
         }
         if scenario == .rtl { calendar.semanticContentAttribute = .forceRightToLeft }
         reset()

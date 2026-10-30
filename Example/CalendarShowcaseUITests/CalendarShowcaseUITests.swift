@@ -161,9 +161,40 @@ final class CalendarShowcaseUITests: XCTestCase {
             app.buttons["next"].tap()
             wait(page, contains: "2024-03")
             XCTAssertTrue(day(app, "2024-04-01").isHittable)
-            let image = XCTAttachment(screenshot: app.screenshot())
-            image.name = "swift-rounded-months-\(selection)-\(interfaceStyle)"
-            image.lifetime = .keepAlways; add(image)
+            let agenda = app.tables["agenda"]
+            func capture(_ position: String) {
+                let image = XCTAttachment(screenshot: app.screenshot())
+                image.name = "swift-blur-months-\(selection)-\(interfaceStyle)-\(position)"
+                image.lifetime = .keepAlways; add(image)
+            }
+            capture("before-scroll")
+            let calendarPage = page.label, selectionState = state.label
+            let monthFrame = day(app, "2024-03-01").frame
+            func firstExposedRow() -> String? {
+                let headerBottom = app.staticTexts["event-state"].frame.maxY + 10
+                return agenda.cells.allElementsBoundByIndex.first {
+                    let frame = $0.frame
+                    // Virtualized rows can have infinite frames on newer runtimes.
+                    return frame.minY.isFinite && frame.maxY > headerBottom && frame.minY < agenda.frame.maxY
+                }?.staticTexts.firstMatch.label
+            }
+            let firstRow = firstExposedRow()
+            XCTAssertNotNil(firstRow)
+            XCTAssertTrue(firstRow?.hasPrefix("Agenda item ") == true)
+            // Start below the pinned header; a table-wide swipe would hit the calendar.
+            let start = agenda.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -350)))
+            let scrolled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                MainActor.assumeIsolated {
+                    guard let row = firstExposedRow() else { return false }
+                    return row != firstRow
+                }
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [scrolled], timeout: 5), .completed)
+            XCTAssertEqual(page.label, calendarPage)
+            XCTAssertEqual(state.label, selectionState)
+            XCTAssertEqual(day(app, "2024-03-01").frame.minY, monthFrame.minY, accuracy: 1)
+            capture("after-scroll")
             app.buttons["previous"].tap()
             wait(page, contains: "2024-02")
         }

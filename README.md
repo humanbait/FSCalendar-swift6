@@ -75,6 +75,8 @@ Defaults: Gregorian grids, Sunday first, current locale/time zone, horizontal mo
 
 Open `Example/CalendarShowcase.xcodeproj`, select **CalendarShowcase**, and run Calendar Lab. The showcase runs the Swift implementation. Eighteen scenarios demonstrate paging, continuous sticky headers, selection, placeholders, bounds, custom content/cells, range picking, transitions above a list, sizing, RTL, large text, and dark appearance.
 
+In the iOS **Connected range** example, the calendar stays pinned while the agenda scrolls behind it. Its clear background and alternating translucent month tints preserve the native scroll-edge material on iOS 26+ and regular blur on earlier versions. The colored agenda icons make the effect visible as you scroll; the calendar scrolls independently, and **Scope** changes its height while preserving the agenda position.
+
 ```sh
 swift test
 ./Scripts/test-device.sh YOUR_DEVICE_UDID swift -collect-test-diagnostics never

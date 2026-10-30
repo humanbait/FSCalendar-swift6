@@ -14,7 +14,7 @@ final class SharedDriverTests: XCTestCase {
     }
 
     @MainActor func testNavigationKeepsInitialCalendarHeight() {
-        let window = (UIApplication.shared.delegate as! AppDelegate).window!
+        let window = (UIApplication.shared.delegate as! AppDelegate).showcaseWindow!
         let originalRoot = window.rootViewController
         defer {
             window.rootViewController = originalRoot
@@ -320,7 +320,7 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertEqual(list.tableView.numberOfRows(inSection: 1), 1)
         XCTAssertEqual(list.tableView(list.tableView, cellForRowAt: IndexPath(row: 0, section: 1)).accessibilityIdentifier,
                        "scenario.connectedRange")
-        let window = (UIApplication.shared.delegate as! AppDelegate).window!
+        let window = (UIApplication.shared.delegate as! AppDelegate).showcaseWindow!
         let originalRoot = window.rootViewController
         defer {
             window.rootViewController = originalRoot
@@ -354,8 +354,89 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertTrue(driver.state.selection.isEmpty)
         XCTAssertEqual(driver.view.bounds.height, 400, accuracy: 0.5)
     }
+    @MainActor func testConnectedRangeBlurChromeAndAgendaInsets() throws {
+        let window = (UIApplication.shared.delegate as! AppDelegate).showcaseWindow!
+        let originalRoot = window.rootViewController
+        defer { window.rootViewController = originalRoot; window.makeKeyAndVisible() }
+        let page = ScenarioController(scenario: .connectedRange)
+        let navigation = UINavigationController(rootViewController: page)
+        window.rootViewController = navigation; window.makeKeyAndVisible()
+        navigation.view.layoutIfNeeded(); page.view.layoutIfNeeded()
+        let driver = try XCTUnwrap(page.driver as? SwiftCalendarDriver)
+        let calendar = driver.calendar
+        let chrome = try XCTUnwrap(page.view.subviews.compactMap { $0 as? ConnectedRangeChromeView }.first)
+        let agenda = try XCTUnwrap(page.view.subviews.compactMap { $0 as? UITableView }.first)
+        XCTAssertTrue(calendar.isDescendant(of: chrome.contentView))
+        XCTAssertFalse(calendar.isDescendant(of: chrome.scrollEdgeContainerView))
+        XCTAssertEqual(chrome.alpha, 1)
+        XCTAssertEqual(chrome.contentView.alpha, 1)
+        XCTAssertFalse(chrome.scrollEdgeContainerView.isUserInteractionEnabled)
+        XCTAssertTrue(chrome.scrollEdgeContainerView.accessibilityElementsHidden)
+        XCTAssertEqual(calendar.appearance.backgroundColor, .clear)
+        XCTAssertEqual(calendar.appearance.monthSeparatorCornerRadius, 8)
+        let alternate = try XCTUnwrap(calendar.appearance.alternatingMonthBackgroundColor)
+        for (style, expectedWhite, expectedAlpha): (UIUserInterfaceStyle, CGFloat, CGFloat) in [(.light, 0, 0.04), (.dark, 1, 0.06)] {
+            var white: CGFloat = 0, alpha: CGFloat = 0
+            XCTAssertTrue(alternate.resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getWhite(&white, alpha: &alpha))
+            XCTAssertEqual(white, expectedWhite, accuracy: 0.001)
+            XCTAssertEqual(alpha, expectedAlpha, accuracy: 0.001)
+        }
+        XCTAssertNotEqual(SwiftCalendarDriver(scenario: .continuous).calendar.appearance.backgroundColor, .clear)
+        if #available(iOS 26.0, *) {
+            XCTAssertNil(chrome.effect)
+            let interaction = try XCTUnwrap(chrome.scrollEdgeContainerView.interactions.compactMap {
+                $0 as? UIScrollEdgeElementContainerInteraction
+            }.first)
+            XCTAssertTrue(interaction.scrollView === agenda)
+            XCTAssertEqual(interaction.edge, .top)
+            XCTAssertEqual(agenda.topEdgeEffect.style, .hard)
+        } else {
+            XCTAssertTrue(chrome.effect is UIBlurEffect)
+            XCTAssertTrue(chrome.scrollEdgeContainerView.interactions.isEmpty)
+        }
+        XCTAssertEqual(agenda.contentInsetAdjustmentBehavior, .never)
+        XCTAssertEqual(agenda.contentOffset.y + agenda.contentInset.top, 0, accuracy: 0.5)
+        let position: CGFloat = 123.25
+        agenda.setContentOffset(CGPoint(x: 0, y: position - agenda.contentInset.top), animated: false)
+        let originalPage = calendar.currentPage
+        let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
+        try calendar.setSelection(boundary)
+        page.view.layoutIfNeeded()
+        XCTAssertEqual(calendar.currentPage, originalPage)
+        func checkInsets() {
+            XCTAssertEqual(agenda.contentInset.top, chrome.frame.maxY, accuracy: 0.5)
+            XCTAssertEqual(agenda.verticalScrollIndicatorInsets.top, agenda.contentInset.top, accuracy: 0.5)
+            XCTAssertEqual(agenda.contentOffset.y + agenda.contentInset.top, position, accuracy: 0.5)
+            XCTAssertEqual(chrome.scrollEdgeContainerView.bounds.width, chrome.contentView.bounds.width, accuracy: 0.001)
+            XCTAssertEqual(chrome.scrollEdgeContainerView.bounds.height, chrome.contentView.bounds.height, accuracy: 0.001)
+            XCTAssertGreaterThanOrEqual(agenda.bounds.height - chrome.frame.maxY - page.view.safeAreaInsets.bottom, 79.5)
+        }
+        checkInsets()
+        calendar.reduceMotionOverride = true
+        for mode: CalendarDisplayMode in [.week, .continuousMonths] {
+            driver.toggleScope(); page.view.layoutIfNeeded()
+            XCTAssertEqual(calendar.displayMode, mode)
+            XCTAssertEqual(calendar.selectedDays, boundary)
+            checkInsets()
+        }
+        // Also exercise a short, wide viewport and return to the original layout.
+        let originalSize = navigation.view.bounds.size
+        navigation.view.frame.size = CGSize(width: 700, height: 390)
+        navigation.view.setNeedsLayout(); navigation.view.layoutIfNeeded(); page.view.layoutIfNeeded()
+        checkInsets()
+        XCTAssertGreaterThan(calendar.bounds.height, 0)
+        XCTAssertLessThan(calendar.bounds.height, 400)
+        navigation.view.frame.size = originalSize
+        navigation.view.setNeedsLayout(); navigation.view.layoutIfNeeded(); page.view.layoutIfNeeded()
+        checkInsets()
+        driver.reset(); page.view.layoutIfNeeded()
+        XCTAssertTrue(calendar.selectedDays.isEmpty)
+        XCTAssertEqual(calendar.displayMode, .continuousMonths)
+        checkInsets()
+    }
+
     @MainActor func testConnectedRangeScopePresentationFramesStayOnOneTimeline() throws {
-        let window = (UIApplication.shared.delegate as! AppDelegate).window!
+        let window = (UIApplication.shared.delegate as! AppDelegate).showcaseWindow!
         let originalRoot = window.rootViewController
         defer { window.rootViewController = originalRoot; window.overrideUserInterfaceStyle = .unspecified; window.makeKeyAndVisible() }
         let page = ScenarioController(scenario: .connectedRange)
@@ -363,6 +444,10 @@ final class SharedDriverTests: XCTestCase {
         window.makeKeyAndVisible(); page.view.layoutIfNeeded()
         let driver = try XCTUnwrap(page.driver as? SwiftCalendarDriver)
         let calendar = driver.calendar
+        let chrome = try XCTUnwrap(page.view.subviews.compactMap { $0 as? ConnectedRangeChromeView }.first)
+        let agenda = try XCTUnwrap(page.view.subviews.compactMap { $0 as? UITableView }.first)
+        let agendaPosition: CGFloat = 137.25
+        agenda.setContentOffset(CGPoint(x: 0, y: agendaPosition - agenda.contentInset.top), animated: false)
         calendar.reduceMotionOverride = false
         let boundary = try [CivilDay(year: 2024, month: 2, day: 29), CivilDay(year: 2024, month: 3, day: 1)]
         try calendar.setSelection(boundary)
@@ -398,6 +483,10 @@ final class SharedDriverTests: XCTestCase {
                         abs((calendar.layer.presentation()?.bounds.height ?? 0) - expected) <= pixel
                     }
                     let height = try XCTUnwrap(calendar.layer.presentation()).bounds.height
+                    let chromeBottom = try XCTUnwrap(chrome.layer.presentation()).frame.maxY
+                    let agendaOffset = try XCTUnwrap(agenda.layer.presentation()).bounds.minY
+                    XCTAssertEqual(chromeBottom + agendaOffset, agendaPosition, accuracy: pixel)
+                    XCTAssertEqual(chrome.layer.presentation()?.opacity, 1)
                     let header = try XCTUnwrap(calendar.weekdayStack.layer.presentation()).frame.minY
                     let monthFraction = target.isContinuous ? fraction : 1 - fraction
                     XCTAssertEqual(header, calendar.effectiveHeaderHeight * (1 - monthFraction), accuracy: pixel)

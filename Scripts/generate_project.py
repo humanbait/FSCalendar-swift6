@@ -98,6 +98,8 @@ def target(name, product_type, paths, dependencies=(), frameworks=(), extra=None
                        'INFOPLIST_KEY_UISupportedInterfaceOrientations': 'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
                        'INFOPLIST_KEY_UIRequiresFullScreen': 'YES',
                        'CURRENT_PROJECT_VERSION': '1', 'MARKETING_VERSION': '0.1.0'})
+        if platform != "macos":
+            common['INFOPLIST_KEY_UIApplicationSceneManifest_Generation'] = 'YES'
     if platform == "macos":
         for key in ['IPHONEOS_DEPLOYMENT_TARGET', 'TARGETED_DEVICE_FAMILY',
                     'INFOPLIST_KEY_UILaunchScreen_Generation', 'INFOPLIST_KEY_UISupportedInterfaceOrientations',

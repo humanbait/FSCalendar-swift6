@@ -4,9 +4,24 @@ import UIKit
 @main
 @MainActor
 final class AppDelegate: UIResponder, UIApplicationDelegate {
+    var showcaseWindow: UIWindow? {
+        UIApplication.shared.connectedScenes.compactMap { ($0.delegate as? SceneDelegate)?.window }.first
+    }
+
+    func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: "Calendar Lab", sessionRole: session.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+}
+
+@MainActor
+final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        let window = UIWindow(frame: UIScreen.main.bounds)
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+        let window = UIWindow(windowScene: windowScene)
         // Keep UI-test captures independent of the device's current appearance.
         switch ProcessInfo.processInfo.environment["FSCALENDAR_TEST_APPEARANCE"] {
         case "light": window.overrideUserInterfaceStyle = .light
@@ -27,7 +42,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         window.rootViewController = navigation
         window.makeKeyAndVisible()
         self.window = window
-        return true
     }
 }
 
@@ -74,6 +88,7 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
     private let eventLabel = UILabel()
     private let table = UITableView(frame: .zero, style: .plain)
     private var heightConstraint: NSLayoutConstraint!
+    private var connectedRangeChrome: ConnectedRangeChromeView?
 
     init(scenario: DemoScenario) {
         self.scenario = scenario
@@ -97,12 +112,15 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
         let controls = UIStackView(arrangedSubviews: [button("Previous", action: #selector(previousPage)), button("Next", action: #selector(nextPage)), button("Scope", action: #selector(scope)), button("Reset", action: #selector(reset))])
         controls.distribution = .fillEqually
         controls.spacing = 6
-        let stack = UIStackView(arrangedSubviews: [controls, driver.view, pageLabel, selectionLabel, eventLabel, table])
+        let stack = UIStackView(arrangedSubviews: [controls, driver.view, pageLabel, selectionLabel, eventLabel])
+        if scenario != .connectedRange { stack.addArrangedSubview(table) }
         stack.axis = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         let scroll = UIScrollView()
-        if scenario == .largeText {
+        if scenario == .connectedRange {
+            configureConnectedRangeLayout(stack)
+        } else if scenario == .largeText {
             scroll.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(scroll); scroll.addSubview(stack)
             NSLayoutConstraint.activate([
@@ -156,7 +174,62 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
         }
         updateState()
     }
-    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); updateState() }
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateState()
+        updateAgendaInsets()
+    }
+
+    private func configureConnectedRangeLayout(_ stack: UIStackView) {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        navigationItem.standardAppearance = appearance
+        navigationItem.scrollEdgeAppearance = appearance
+        navigationItem.compactAppearance = appearance
+        navigationItem.compactScrollEdgeAppearance = appearance
+
+        table.translatesAutoresizingMaskIntoConstraints = false
+        table.contentInsetAdjustmentBehavior = .never
+        table.automaticallyAdjustsScrollIndicatorInsets = false
+        table.backgroundColor = .systemBackground
+        view.addSubview(table)
+        setContentScrollView(table, for: .top)
+
+        let chrome = ConnectedRangeChromeView(scrollView: table)
+        connectedRangeChrome = chrome
+        chrome.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(chrome)
+        chrome.contentView.addSubview(stack)
+        chrome.contentView.bringSubviewToFront(chrome.scrollEdgeContainerView)
+        NSLayoutConstraint.activate([
+            table.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            table.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            table.topAnchor.constraint(equalTo: view.topAnchor),
+            table.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            chrome.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            chrome.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            chrome.topAnchor.constraint(equalTo: view.topAnchor),
+            chrome.bottomAnchor.constraint(equalTo: stack.bottomAnchor, constant: 10),
+            // Allow the calendar viewport to shrink on short landscape screens.
+            chrome.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -80),
+            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8)
+        ])
+    }
+
+    private func updateAgendaInsets() {
+        guard let chrome = connectedRangeChrome else { return }
+        let insets = UIEdgeInsets(top: chrome.frame.maxY - table.frame.minY, left: 0,
+                                  bottom: view.safeAreaInsets.bottom, right: 0)
+        guard table.contentInset != insets else { return }
+        // Keep the same agenda position as the pinned header resizes in the
+        // calendar's existing animation, including a list already scrolled down.
+        let position = table.contentOffset.y + table.contentInset.top
+        table.contentInset = insets
+        table.verticalScrollIndicatorInsets = insets
+        table.setContentOffset(CGPoint(x: table.contentOffset.x, y: position - insets.top), animated: false)
+    }
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         pageLabel.accessibilityValue = view.bounds.width > view.bounds.height ? "landscape" : "portrait"
@@ -198,6 +271,11 @@ final class ScenarioController: UIViewController, UITableViewDataSource, UIGestu
         var content = cell.defaultContentConfiguration()
         content.text = "Agenda item \(indexPath.row + 1)"
         content.secondaryText = "Scroll to exercise calendar and list coordination"
+        if scenario == .connectedRange {
+            let colors: [UIColor] = [.systemBlue, .systemOrange, .systemGreen, .systemPink]
+            content.image = UIImage(systemName: "checkmark.circle.fill")
+            content.imageProperties.tintColor = colors[indexPath.row % colors.count]
+        }
         cell.contentConfiguration = content
         return cell
     }
