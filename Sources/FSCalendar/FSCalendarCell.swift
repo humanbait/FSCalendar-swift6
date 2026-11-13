@@ -11,6 +11,10 @@ import FSCalendarCore
     public private(set) var dayState: DayState?
     private let eventStack = UIStackView()
     private var radius: CGFloat?
+    // Zero preserves paged geometry; one centers content in a continuous row.
+    var continuousCenteringProgress: CGFloat = 0 {
+        didSet { if oldValue != continuousCenteringProgress { setNeedsLayout() } }
+    }
 
     public override init(frame: CGRect) { super.init(frame: frame); setUp() }
     public required init?(coder: NSCoder) { super.init(coder: coder); setUp() }
@@ -70,9 +74,10 @@ import FSCalendarCore
         let hasImage = dayImageView.image != nil
         let textHeight = min(titleLabel.font.lineHeight, bounds.height * (hasSubtitle || hasImage ? 0.45 : 0.7))
         let subtitleHeight = hasSubtitle ? min(subtitleLabel.font.lineHeight, bounds.height * 0.25) : 0
-        // Match the legacy cell: text and shape share the upper five-sixths.
+        // Preserve the legacy shape size while centering continuous rows.
         let contentHeight = bounds.height * 5 / 6
-        let top = (contentHeight - textHeight - subtitleHeight) / 2
+        let offset = bounds.height / 12 * continuousCenteringProgress
+        let top = (contentHeight - textHeight - subtitleHeight) / 2 + offset
         let imageSpace: CGFloat = hasImage ? 16 : 0
         let imageOnLeft = effectiveUserInterfaceLayoutDirection == .rightToLeft
         titleLabel.frame = CGRect(x: 2 + (imageOnLeft ? imageSpace : 0), y: top,
@@ -85,10 +90,13 @@ import FSCalendarCore
         let standardDiameter: CGFloat = 100 / 3
         let availableDiameter = max(0, min(bounds.width, contentHeight))
         let side = availableDiameter - max(0, availableDiameter - standardDiameter) / 2
-        selectionBackground.frame = CGRect(x: (bounds.width - side) / 2, y: (contentHeight - side) / 2, width: side, height: side)
+        selectionBackground.frame = CGRect(x: (bounds.width - side) / 2, y: (contentHeight - side) / 2 + offset, width: side, height: side)
         let eventSize = side / 6
         let dotHeight = min(4, eventSize * 0.83)
-        let dotY = selectionBackground.frame.maxY + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
+        let legacyDotY = (contentHeight + side) / 2 + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
+        let centeredTextBottom = (bounds.height + textHeight + subtitleHeight) / 2
+        let centeredDotY = min(max(0, bounds.height - dotHeight), centeredTextBottom + 2)
+        let dotY = legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
         eventStack.frame = CGRect(x: (bounds.width - dotWidth) / 2, y: dotY, width: dotWidth, height: dotHeight)
         for dot in eventStack.arrangedSubviews { dot.layer.cornerRadius = dotHeight / 2 }
         selectionBackground.layer.cornerRadius = radius ?? min(selectionBackground.bounds.width, selectionBackground.bounds.height) / 2
@@ -106,6 +114,7 @@ import FSCalendarCore
         super.prepareForReuse()
         selectionBackground.layer.removeAnimation(forKey: "selectionBounce")
         alpha = 1
+        continuousCenteringProgress = 0
         dayState = nil; titleLabel.text = nil; subtitleLabel.text = nil; dayImageView.image = nil
         accessibilityLabel = nil; accessibilityValue = nil; accessibilityIdentifier = nil
         isHidden = false; isSelected = false

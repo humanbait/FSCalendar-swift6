@@ -37,6 +37,94 @@ extension FSCalendar: RendererSelectionContract {}
 }
 
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testContinuousCellCentersContentAndKeepsEventsInsideRow() throws {
+        let view = try make(.multiple)
+        let provider = MonthLabelProvider()
+        view.dataSource = provider
+        let day = try CivilDay(year: 2024, month: 3, day: 1)
+        let occurrence = try XCTUnwrap(view.engine.continuousMonthGrid(containing: day).occurrences.first)
+        let cell = FSCalendarCell(frame: .zero)
+        for height: CGFloat in [44, 45.4121, 80] {
+            cell.frame = CGRect(x: 0, y: 0, width: 54.3, height: height)
+            for fontSize: CGFloat in [17, 32] {
+                view.appearance.titleFont = .systemFont(ofSize: fontSize)
+                for subtitle in [nil, "Note"] as [String?] {
+                    for image in [nil, UIImage(systemName: "heart")] {
+                        for events in [0, 1, 3] {
+                            provider.content = DayContent(subtitle: subtitle, image: image, numberOfEvents: events)
+                            for selected in [false, true] {
+                                try view.setSelection(selected ? [day] : [])
+                                view.today = day
+                                try view.setDisplayMode(.week, animated: false)
+                                view.configure(cell, occurrence: occurrence); cell.layoutIfNeeded()
+                                let legacyTitle = cell.titleLabel.frame
+                                let legacyShape = cell.selectionBackground.frame
+                                try view.setDisplayMode(.continuousMonths, animated: false)
+                                view.configure(cell, occurrence: occurrence); cell.layoutIfNeeded()
+                                XCTAssertEqual(cell.titleLabel.text, "Mar")
+                                let textFrame = subtitle == nil ? cell.titleLabel.frame : cell.titleLabel.frame.union(cell.subtitleLabel.frame)
+                                XCTAssertEqual(textFrame.midY, height / 2, accuracy: 0.001)
+                                XCTAssertEqual(cell.selectionBackground.frame.midY, height / 2, accuracy: 0.001)
+                                XCTAssertEqual(cell.selectionBackground.frame.size, legacyShape.size)
+                                XCTAssertEqual(cell.titleLabel.frame.minY - legacyTitle.minY, height / 12, accuracy: 0.001)
+                                if image != nil {
+                                    XCTAssertEqual(cell.dayImageView.frame.midY, cell.titleLabel.frame.midY, accuracy: 0.001)
+                                }
+                                let dots = try XCTUnwrap(cell.contentView.subviews.compactMap { $0 as? UIStackView }.first)
+                                XCTAssertEqual(dots.isHidden, events == 0)
+                                XCTAssertGreaterThanOrEqual(dots.frame.minY, textFrame.maxY)
+                                XCTAssertLessThanOrEqual(dots.frame.maxY, height)
+                                cell.prepareForReuse()
+                                XCTAssertEqual(cell.continuousCenteringProgress, 0)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor func testOrdinaryDayCenteringFollowsModeAndReuse() throws {
+        let view = try make()
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        let occurrence = try XCTUnwrap(view.engine.continuousMonthGrid(containing: day).occurrences.first { $0.day == day })
+        let cell = FSCalendarCell(frame: CGRect(x: 0, y: 0, width: 55, height: 44))
+        for mode: CalendarDisplayMode in [.continuousMonths, .week, .continuousMonths, .month(.horizontal), .month(.vertical)] {
+            cell.prepareForReuse()
+            try view.setDisplayMode(mode, animated: false)
+            view.configure(cell, occurrence: occurrence); cell.layoutIfNeeded()
+            XCTAssertEqual(cell.titleLabel.text, "14")
+            XCTAssertEqual(cell.titleLabel.frame.midY, mode.isContinuous ? 22 : 44 * 5 / 12, accuracy: 0.001)
+        }
+    }
+
+    @MainActor func testContinuousCenteringVisualComparison() throws {
+        let view = try make(.multiple)
+        let provider = MonthLabelProvider()
+        provider.content = DayContent(numberOfEvents: 1)
+        view.dataSource = provider
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let (window, _) = hostForAnimation(view, height: 400)
+        defer { window.isHidden = true }
+        let day = try CivilDay(year: 2024, month: 3, day: 1)
+        try view.setCurrentPage(day, animated: false)
+        try view.setSelection([day])
+        view.layoutIfNeeded()
+        for progress: CGFloat in [0, 1] {
+            for cell in view.collectionView.visibleCells.compactMap({ $0 as? FSCalendarCell }) {
+                cell.continuousCenteringProgress = progress
+                cell.layoutIfNeeded()
+            }
+            let image = UIGraphicsImageRenderer(bounds: view.bounds).image { context in
+                view.layer.render(in: context.cgContext)
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = progress == 0 ? "continuous-centering-before" : "continuous-centering-after"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
     @MainActor func testMonthSeparatorGeometryMirroringAndDecorationLifecycle() throws {
 
         for weekday in 1...7 {
@@ -536,6 +624,10 @@ final class CalendarViewTests: XCTestCase {
             XCTAssertEqual(view.bounds.height, 400 + (context.targetHeight - 400) * progress, accuracy: pixel)
             for day in boundary {
                 XCTAssertEqual(try cell(day).alpha, 1)
+                let contentCell = try cell(day)
+                XCTAssertEqual(contentCell.selectionBackground.frame.midY,
+                    contentCell.bounds.height / 2 - contentCell.bounds.height / 12 * progress, accuracy: 0.001)
+                XCTAssertEqual(contentCell.titleLabel.frame.midY, contentCell.selectionBackground.frame.midY, accuracy: 0.001)
                 XCTAssertEqual(try cell(day).convert(cell(day).bounds, to: view).minY,
                     originalY + (view.effectiveHeaderHeight + view.effectiveWeekdayHeight - originalY) * progress, accuracy: pixel)
             }
@@ -622,6 +714,10 @@ final class CalendarViewTests: XCTestCase {
             XCTAssertEqual(view.bounds.height, 400.5, accuracy: 0.5)
             XCTAssertTrue(context.titleFades.allSatisfy { $0.outgoing.superview == nil })
             XCTAssertEqual(view.selectedDays, days)
+            for cell in view.collectionView.visibleCells.compactMap({ $0 as? FSCalendarCell }) {
+                cell.layoutIfNeeded()
+                XCTAssertEqual(cell.selectionBackground.frame.midY, cell.bounds.midY, accuracy: 0.001)
+            }
         }
     }
 

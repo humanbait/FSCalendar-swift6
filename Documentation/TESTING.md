@@ -345,3 +345,35 @@ The project was regenerated for the chrome helper and scene manifest.
 No test-service failure occurred in the final simulator or physical hosted checks.
 Physical UI automation was not rerun; its previously recorded `testmanagerd` gap remains.
 Package and macOS tests were not repeated because their sources and behavior are unchanged.
+
+## UIKit continuous-row centering — 2026-11-14
+
+Continuous mode now centers day text and selection/today circles in the full row,
+retaining the existing circle diameter. Subtitles and images follow the text group;
+event dots sit below the text without moving event-bearing dates or escaping the row.
+Paged month/week geometry remains unchanged. The internal centering factor follows
+continuous/week transition progress, including outgoing month-title snapshots and reuse.
+The connected-range example retains its own centered layout; AppKit is unchanged.
+
+Validated with Xcode 27.2 (27B52), warnings treated as errors, on the booted
+iPhone 18 Pro / iOS 27.2 simulator, using the CalendarShowcase scheme:
+
+| Check | Result | Evidence under ignored `artifacts/centering/` |
+| --- | --- | --- |
+| `-only-testing:CalendarShowcaseTests` | 74 passed | `HostedTests.xcresult` |
+| Added ordinary-day mode/reuse and expanded resize-cancellation checks | 2 passed | `FinalFocusedTests.xcresult` |
+| After visual refinement of dot spacing: all CalendarViewTests plus connected-range centered-title/event reuse and presentation timeline tests | 46 passed | `FinalLayoutTests.xcresult` |
+
+All runs use `-parallel-testing-enabled NO` and `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
+The final run includes 44 calendar tests and two connected-range tests. Geometry
+coverage includes month labels and ordinary numbers, selected/today states, events,
+subtitles, images, larger fonts, fractional sizes, legacy paged alignment, reuse,
+quarter-step scope progress, RTL, and cancellation. Existing reversal tests pass.
+
+Inspected the before/after layer-rendered calendar captures retained in
+`final-attachments/`: February/March and March/April boundaries show centered text
+and circles, with event dots clear of month edges and visible inside the selected
+circle. The before attachment uses the preserved legacy centering factor on the same
+fixture. These are hosted rendering captures, not full-device UI screenshots.
+Physical-device validation, iOS 16, and manual VoiceOver were not repeated.
+No files were added, so Xcode project regeneration was unnecessary.

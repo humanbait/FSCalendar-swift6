@@ -164,6 +164,14 @@ extension FSCalendar {
             for cell in collectionView.visibleCells {
                 if let index = collectionView.indexPath(for: cell) { applyTransitionOpacity(to: cell, at: index) }
             }
+            // Cell content and outgoing month titles share the scope animation.
+            for cell in collectionView.visibleCells.compactMap({ $0 as? FSCalendarCell }) {
+                cell.continuousCenteringProgress = context.monthProgress
+                cell.layoutIfNeeded()
+            }
+            for fade in context.titleFades {
+                fade.outgoing.frame.origin.y = fade.label.frame.midY - fade.outgoing.frame.height / 2
+            }
             // Both rules and month fills share the scope animation.
             for decoration in collectionView.subviews.compactMap({ $0 as? MonthSeparatorView }) {
                 decoration.alpha = context.monthProgress

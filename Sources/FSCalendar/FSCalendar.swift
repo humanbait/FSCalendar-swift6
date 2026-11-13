@@ -304,6 +304,8 @@ import FSCalendarCore
         return grid
     }
     func configure(_ cell: FSCalendarCell, occurrence: DayOccurrence) {
+        cell.continuousCenteringProgress = transition.flatMap { $0.isContinuousScope ? $0.monthProgress : nil }
+            ?? (renderingMode.isContinuous ? 1 : 0)
         var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
         let titleMode = transition.flatMap { $0.isContinuousScope ? $0.targetMode : nil } ?? renderingMode
         if titleMode.isContinuous, occurrence.day.day == 1, content.title == nil {
