@@ -11,10 +11,13 @@ import FSCalendarCore
     public private(set) var dayState: DayState?
     private let eventStack = UIStackView()
     private var radius: CGFloat?
+    private var normalEventColor: UIColor = .clear
+    private var selectedEventColor: UIColor = .clear
     // Zero preserves paged geometry; one centers content in a continuous row.
     var continuousCenteringProgress: CGFloat = 0 {
         didSet { if oldValue != continuousCenteringProgress { setNeedsLayout() } }
     }
+    var hasAutomaticYearSubtitle = false
 
     public override init(frame: CGRect) { super.init(frame: frame); setUp() }
     public required init?(coder: NSCoder) { super.init(coder: coder); setUp() }
@@ -44,8 +47,13 @@ import FSCalendarCore
         isSelected = state.isSelected
         titleLabel.font = appearance.titleFont
         subtitleLabel.font = appearance.subtitleFont
+        // Keep both parts of an automatic month/year readable in narrow columns,
+        // including the largest accessibility text sizes.
+        titleLabel.minimumScaleFactor = hasAutomaticYearSubtitle ? 0.25 : 0.65
+        subtitleLabel.minimumScaleFactor = hasAutomaticYearSubtitle ? 0.25 : 0.65
         titleLabel.text = content.title ?? String(state.occurrence.day.day)
         subtitleLabel.text = content.subtitle
+        subtitleLabel.alpha = hasAutomaticYearSubtitle ? continuousCenteringProgress : 1
         dayImageView.image = content.image
         dayImageView.tintColor = style.titleColor ?? appearance.titleColor
         radius = style.cornerRadius.flatMap { $0.isFinite ? max(0, $0) : nil }
@@ -56,6 +64,8 @@ import FSCalendarCore
             : (style.fillColor ?? (state.isToday ? appearance.todayColor.withAlphaComponent(0.18) : .clear))
         selectionBackground.layer.borderColor = (style.borderColor ?? (state.isToday ? appearance.todayColor : .clear)).cgColor
         selectionBackground.layer.borderWidth = style.borderColor != nil || state.isToday ? 1 : 0
+        normalEventColor = style.eventColor ?? appearance.eventColor
+        selectedEventColor = appearance.selectedTitleColor
         for (index, dot) in eventStack.arrangedSubviews.enumerated() {
             dot.isHidden = index >= min(3, content.numberOfEvents)
             dot.backgroundColor = state.isSelected ? appearance.selectedTitleColor : (style.eventColor ?? appearance.eventColor)
@@ -72,12 +82,16 @@ import FSCalendarCore
         super.layoutSubviews()
         let hasSubtitle = !(subtitleLabel.text ?? "").isEmpty
         let hasImage = dayImageView.image != nil
-        let textHeight = min(titleLabel.font.lineHeight, bounds.height * (hasSubtitle || hasImage ? 0.45 : 0.7))
+        let subtitleProgress = hasAutomaticYearSubtitle ? continuousCenteringProgress : 1
+        let titleFraction: CGFloat = hasImage ? 0.45 : (hasSubtitle ? 0.7 - 0.25 * subtitleProgress : 0.7)
+        let textHeight = min(titleLabel.font.lineHeight, bounds.height * titleFraction)
         let subtitleHeight = hasSubtitle ? min(subtitleLabel.font.lineHeight, bounds.height * 0.25) : 0
+        subtitleLabel.alpha = subtitleProgress
+        let occupiedSubtitleHeight = subtitleHeight * subtitleProgress
         // Preserve the legacy shape size while centering continuous rows.
         let contentHeight = bounds.height * 5 / 6
         let offset = bounds.height / 12 * continuousCenteringProgress
-        let top = (contentHeight - textHeight - subtitleHeight) / 2 + offset
+        let top = (contentHeight - textHeight - occupiedSubtitleHeight) / 2 + offset
         let imageSpace: CGFloat = hasImage ? 16 : 0
         let imageOnLeft = effectiveUserInterfaceLayoutDirection == .rightToLeft
         titleLabel.frame = CGRect(x: 2 + (imageOnLeft ? imageSpace : 0), y: top,
@@ -94,10 +108,16 @@ import FSCalendarCore
         let eventSize = side / 6
         let dotHeight = min(4, eventSize * 0.83)
         let legacyDotY = (contentHeight + side) / 2 + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
-        let centeredTextBottom = (bounds.height + textHeight + subtitleHeight) / 2
+        let centeredTextBottom = (bounds.height + textHeight + occupiedSubtitleHeight) / 2
         let centeredDotY = min(max(0, bounds.height - dotHeight), centeredTextBottom + 2)
         let dotY = legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
         eventStack.frame = CGRect(x: (bounds.width - dotWidth) / 2, y: dotY, width: dotWidth, height: dotHeight)
+        if hasAutomaticYearSubtitle {
+            let insideSelection = eventStack.frame.maxY <= selectionBackground.frame.maxY
+            for dot in eventStack.arrangedSubviews {
+                dot.backgroundColor = isSelected && insideSelection ? selectedEventColor : normalEventColor
+            }
+        }
         for dot in eventStack.arrangedSubviews { dot.layer.cornerRadius = dotHeight / 2 }
         selectionBackground.layer.cornerRadius = radius ?? min(selectionBackground.bounds.width, selectionBackground.bounds.height) / 2
     }
@@ -115,6 +135,7 @@ import FSCalendarCore
         selectionBackground.layer.removeAnimation(forKey: "selectionBounce")
         alpha = 1
         continuousCenteringProgress = 0
+        hasAutomaticYearSubtitle = false; subtitleLabel.alpha = 1
         dayState = nil; titleLabel.text = nil; subtitleLabel.text = nil; dayImageView.image = nil
         accessibilityLabel = nil; accessibilityValue = nil; accessibilityIdentifier = nil
         isHidden = false; isSelected = false

@@ -37,8 +37,143 @@ extension FSCalendar: RendererSelectionContract {}
 }
 
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testAutomaticMonthYearsRespectClockModeAndCustomContent() throws {
+        let view = try make()
+        view.referenceDate = { Date(timeIntervalSince1970: 1767225600) } // 2026-01-01 UTC
+        view.today = try CivilDay(year: 2027, month: 1, day: 1)
+        let provider = MonthLabelProvider(); view.dataSource = provider
+        let cell = FSCalendarCell(frame: CGRect(x: 0, y: 0, width: 56, height: 44))
+        for mode: CalendarDisplayMode in [.continuousMonths, .week, .month(.horizontal)] {
+            try view.setDisplayMode(mode, animated: false)
+            for year in [2025, 2026, 2027] {
+                for month in [1, 6, 12] {
+                    for number in [1, 2] {
+                        let day = try CivilDay(year: year, month: month, day: number)
+                        let occurrence = try XCTUnwrap(view.engine.continuousMonthGrid(containing: day).occurrences.first { $0.day == day })
+                        for custom in [DayContent(), DayContent(title: "Launch"), DayContent(title: ""),
+                                       DayContent(subtitle: "Note"), DayContent(subtitle: "")] {
+                            provider.content = custom
+                            cell.prepareForReuse()
+                            view.configure(cell, occurrence: occurrence); cell.layoutIfNeeded()
+                            let automatic = mode.isContinuous && number == 1 && year != 2026 && custom.title == nil && custom.subtitle == nil
+                            XCTAssertEqual(cell.subtitleLabel.text, automatic ? String(year) : custom.subtitle)
+                            XCTAssertEqual(cell.hasAutomaticYearSubtitle, automatic)
+                            XCTAssertEqual(cell.subtitleLabel.alpha, 1)
+                            if automatic {
+                                XCTAssertEqual(cell.titleLabel.frame.union(cell.subtitleLabel.frame).midY, 22, accuracy: 0.001)
+                                XCTAssertEqual(cell.subtitleLabel.textColor, view.resolvedAppearance.subtitleColor)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor func testMonthYearsRefreshAtRolloverForegroundAndTimeZoneChange() throws {
+        let view = try make()
+        var instant = Date(timeIntervalSince1970: 1798761599) // 2026-12-31 23:59:59 UTC
+        view.referenceDate = { instant }
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let (window, spy) = hostForAnimation(view, height: 400)
+        defer { withExtendedLifetime(spy) {}; window.isHidden = true }
+        let january = try CivilDay(year: 2027, month: 1, day: 1)
+        try view.setCurrentPage(january, animated: false); view.layoutIfNeeded()
+        func monthCell() throws -> FSCalendarCell {
+            try XCTUnwrap(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.first { $0.dayState?.occurrence.day == january })
+        }
+        XCTAssertEqual(try monthCell().subtitleLabel.text, "2027")
+        let offset = view.collectionView.contentOffset
+        instant = instant.addingTimeInterval(2)
+        NotificationCenter.default.post(name: UIApplication.significantTimeChangeNotification, object: nil)
+        XCTAssertNil(try monthCell().subtitleLabel.text)
+        XCTAssertEqual(view.collectionView.contentOffset, offset)
+        instant = instant.addingTimeInterval(-2)
+        NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
+        XCTAssertEqual(try monthCell().subtitleLabel.text, "2027")
+        try view.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 3600)!))
+        view.layoutIfNeeded()
+        XCTAssertNil(try monthCell().subtitleLabel.text)
+        try view.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: -3600)!))
+        view.layoutIfNeeded()
+        XCTAssertEqual(try monthCell().subtitleLabel.text, "2027")
+    }
+
+    @MainActor func testYearSubtitleFadesAndRestoresAcrossScopeTransitions() throws {
+        let view = try make()
+        view.referenceDate = { Date(timeIntervalSince1970: 1767225600) }
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let (window, spy) = hostForAnimation(view, height: 400)
+        defer { withExtendedLifetime(spy) {}; window.isHidden = true }
+        let january = try CivilDay(year: 2027, month: 1, day: 1)
+        try view.setSelection([january]); try view.setCurrentPage(january, animated: false)
+        view.layoutIfNeeded()
+        func monthCell() throws -> FSCalendarCell {
+            try XCTUnwrap(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.first { $0.dayState?.occurrence.day == january })
+        }
+        for target: CalendarDisplayMode in [.week, .continuousMonths] {
+            try view.prepareTransition(to: target)
+            for progress: CGFloat in [0, 0.25, 0.5, 0.75, 1, 0.5, 0] {
+                view.updateInteractiveTransition(progress: progress)
+                let cell = try monthCell()
+                let monthProgress = target == .week ? 1 - progress : progress
+                XCTAssertEqual(cell.subtitleLabel.text, "2027")
+                XCTAssertEqual(cell.subtitleLabel.alpha, monthProgress, accuracy: 0.001)
+                XCTAssertEqual(cell.titleLabel.frame.midY + cell.subtitleLabel.frame.height * monthProgress / 2,
+                    cell.selectionBackground.frame.midY, accuracy: 0.001)
+            }
+            view.finishInteractiveTransition(commit: false, animated: false)
+            XCTAssertEqual(try monthCell().subtitleLabel.text, target == .week ? "2027" : nil)
+            try view.prepareTransition(to: target)
+            view.updateInteractiveTransition(progress: 1)
+            view.finishInteractiveTransition(commit: true, animated: false)
+            XCTAssertEqual(try monthCell().subtitleLabel.text, target == .week ? nil : "2027")
+        }
+    }
+
+    @MainActor func testMonthYearVisualStates() throws {
+        let view = try make()
+        view.referenceDate = { Date(timeIntervalSince1970: 1767225600) }
+        let provider = MonthLabelProvider(); view.dataSource = provider
+        try view.setDisplayMode(.continuousMonths, animated: false)
+        let parent = UIViewController(), child = UIViewController()
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = parent; window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        parent.addChild(child); parent.view.addSubview(child.view); child.didMove(toParent: parent)
+        child.view.addSubview(view)
+        view.frame.size.height = 400
+        let january = try CivilDay(year: 2027, month: 1, day: 1)
+        try view.setCurrentPage(january, animated: false)
+        for (name, selected, events, fontSize) in [("plain", false, 0, 17), ("selected-events", true, 1, 17), ("large-text", false, 1, 30)] {
+            provider.content = DayContent(numberOfEvents: events)
+            if fontSize > 17 {
+                parent.setOverrideTraitCollection(UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge), forChild: child)
+                parent.view.layoutIfNeeded(); child.view.layoutIfNeeded(); view.layoutIfNeeded()
+                XCTAssertEqual(view.traitCollection.preferredContentSizeCategory, .accessibilityExtraExtraExtraLarge)
+                XCTAssertGreaterThan(view.resolvedAppearance.titleFont.pointSize, 17)
+            }
+            try view.setSelection(selected ? [january] : [])
+            view.layoutIfNeeded()
+            let cell = try XCTUnwrap(view.collectionView.visibleCells.compactMap { $0 as? FSCalendarCell }.first { $0.dayState?.occurrence.day == january })
+            XCTAssertEqual(cell.titleLabel.text, "Jan")
+            XCTAssertEqual(cell.subtitleLabel.text, "2027")
+            XCTAssertEqual(cell.titleLabel.frame.union(cell.subtitleLabel.frame).midY, cell.bounds.midY, accuracy: 0.001)
+            let dots = try XCTUnwrap(cell.contentView.subviews.compactMap { $0 as? UIStackView }.first)
+            XCTAssertGreaterThanOrEqual(dots.frame.minY, cell.subtitleLabel.frame.maxY)
+            XCTAssertLessThanOrEqual(dots.frame.maxY, cell.bounds.maxY)
+            if selected && dots.frame.maxY > cell.selectionBackground.frame.maxY {
+                XCTAssertEqual(dots.arrangedSubviews.first?.backgroundColor, view.appearance.eventColor)
+            }
+            let image = UIGraphicsImageRenderer(bounds: view.bounds).image { view.layer.render(in: $0.cgContext) }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "month-year-" + name; attachment.lifetime = .keepAlways; add(attachment)
+        }
+    }
+
     @MainActor func testContinuousCellCentersContentAndKeepsEventsInsideRow() throws {
         let view = try make(.multiple)
+        view.referenceDate = { Date(timeIntervalSince1970: 1704067200) } // 2024-01-01 UTC
         let provider = MonthLabelProvider()
         view.dataSource = provider
         let day = try CivilDay(year: 2024, month: 3, day: 1)
@@ -627,7 +762,9 @@ final class CalendarViewTests: XCTestCase {
                 let contentCell = try cell(day)
                 XCTAssertEqual(contentCell.selectionBackground.frame.midY,
                     contentCell.bounds.height / 2 - contentCell.bounds.height / 12 * progress, accuracy: 0.001)
-                XCTAssertEqual(contentCell.titleLabel.frame.midY, contentCell.selectionBackground.frame.midY, accuracy: 0.001)
+                let occupiedSubtitle = contentCell.subtitleLabel.frame.height * contentCell.subtitleLabel.alpha
+                XCTAssertEqual(contentCell.titleLabel.frame.midY + occupiedSubtitle / 2,
+                    contentCell.selectionBackground.frame.midY, accuracy: 0.001)
                 XCTAssertEqual(try cell(day).convert(cell(day).bounds, to: view).minY,
                     originalY + (view.effectiveHeaderHeight + view.effectiveWeekdayHeight - originalY) * progress, accuracy: pixel)
             }

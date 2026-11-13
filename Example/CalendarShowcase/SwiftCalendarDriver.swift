@@ -163,6 +163,8 @@ import FSCalendarCore
 }
 
 @MainActor class ConnectedRangeSwiftCell: FSCalendarCell {
+    private var normalEventColor: UIColor = .clear
+    private var selectedEventColor: UIColor = .clear
     // A layer supplies decoration without adding an input or accessibility target.
     private let eventIndicator: CALayer = {
         let layer = CALayer()
@@ -179,6 +181,8 @@ import FSCalendarCore
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         if eventIndicator.superlayer == nil { contentView.layer.addSublayer(eventIndicator) }
         eventIndicator.isHidden = content.numberOfEvents == 0
+        normalEventColor = style.eventColor ?? appearance.eventColor
+        selectedEventColor = appearance.selectedTitleColor
         eventIndicator.backgroundColor = (state.isSelected ? appearance.selectedTitleColor :
             (style.eventColor ?? appearance.eventColor)).resolvedColor(with: traitCollection).cgColor
         if content.numberOfEvents > 0 {
@@ -189,10 +193,16 @@ import FSCalendarCore
     override func layoutSubviews() {
         super.layoutSubviews()
         let bounds = contentView.bounds
+        let subtitleHeight = subtitleLabel.frame.height * subtitleLabel.alpha
         titleLabel.frame.origin = CGPoint(x: bounds.midX - titleLabel.frame.width / 2,
-                                          y: bounds.midY - titleLabel.frame.height / 2)
+                                          y: bounds.midY - (titleLabel.frame.height + subtitleHeight) / 2)
+        subtitleLabel.frame.origin.y = titleLabel.frame.maxY
         selectionBackground.frame.origin.y = bounds.midY - selectionBackground.frame.height / 2
-        eventIndicator.frame = CGRect(x: bounds.midX - 2, y: titleLabel.frame.maxY + 3, width: 4, height: 4)
+        eventIndicator.frame = CGRect(x: bounds.midX - 2,
+                                      y: min(bounds.maxY - 4, titleLabel.frame.maxY + subtitleHeight + 3), width: 4, height: 4)
+        let outsideSelection = subtitleHeight > 0 && eventIndicator.frame.maxY > selectionBackground.frame.maxY
+        eventIndicator.backgroundColor = (isSelected && !outsideSelection ? selectedEventColor : normalEventColor)
+            .resolvedColor(with: traitCollection).cgColor
         let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
                                         .layerMaxXMinYCorner, .layerMaxXMaxYCorner]
         guard let day = dayState?.occurrence.day, dayState?.isSelected == true else {

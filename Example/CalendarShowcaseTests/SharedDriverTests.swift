@@ -6,6 +6,29 @@ import FSCalendarCore
 @testable import CalendarShowcase
 
 final class SharedDriverTests: XCTestCase {
+    @MainActor func testConnectedRangeMonthYearLayoutAndEventSpacing() throws {
+        let day = try CivilDay(year: 2027, month: 1, day: 1)
+        let occurrence = try XCTUnwrap(CalendarEngine(configuration: CalendarConfiguration()).continuousMonthGrid(containing: day).occurrences.first)
+        let cell = ConnectedRangeSwiftCell(frame: .zero)
+        for height: CGFloat in [44, 59.5, 80] {
+            cell.frame = CGRect(x: 0, y: 0, width: 56, height: height)
+            for selected in [false, true] {
+                for events in [0, 1] {
+                    cell.apply(content: DayContent(title: "Jan", subtitle: "2027", numberOfEvents: events),
+                        state: DayState(occurrence: occurrence, isSelected: selected, isToday: true),
+                        appearance: FSCalendarAppearance(), style: DayAppearance())
+                    cell.layoutIfNeeded()
+                    XCTAssertEqual(cell.titleLabel.frame.union(cell.subtitleLabel.frame).midY, height / 2, accuracy: 0.001)
+                    XCTAssertEqual(cell.selectionBackground.frame.midY, height / 2, accuracy: 0.001)
+                    let dot = try XCTUnwrap(cell.contentView.layer.sublayers?.first { $0.name == "connectedRange.event" })
+                    XCTAssertGreaterThanOrEqual(dot.frame.minY, cell.subtitleLabel.frame.maxY)
+                    XCTAssertLessThanOrEqual(dot.frame.maxY, height)
+                    XCTAssertEqual(dot.isHidden, events == 0)
+                }
+            }
+        }
+    }
+
     @MainActor private func makeWindow() -> UIWindow {
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first!
         let window = UIWindow(windowScene: scene)
@@ -247,8 +270,11 @@ final class SharedDriverTests: XCTestCase {
         for cell in [february, march] {
             let dot = try XCTUnwrap((cell.contentView.layer.sublayers ?? []).first { $0.name == "connectedRange.event" })
             XCTAssertFalse(dot.isHidden)
-            XCTAssertEqual(cell.titleLabel.frame.midY, cell.contentView.bounds.midY, accuracy: 0.01)
-            XCTAssertEqual(dot.backgroundColor, UIColor.white.cgColor)
+            XCTAssertEqual(cell.titleLabel.frame.midY + cell.subtitleLabel.frame.height * cell.subtitleLabel.alpha / 2,
+                cell.contentView.bounds.midY, accuracy: 0.01)
+            let outside = cell.subtitleLabel.frame.height > 0 && dot.frame.maxY > cell.selectionBackground.frame.maxY
+            XCTAssertEqual(dot.backgroundColor, (outside ? driver.calendar.appearance.eventColor : UIColor.white)
+                .resolvedColor(with: cell.traitCollection).cgColor)
             XCTAssertTrue((cell.accessibilityValue ?? "").contains("Has events"))
             XCTAssertTrue((cell.accessibilityLabel ?? "").contains("2024"))
         }
@@ -267,7 +293,8 @@ final class SharedDriverTests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 3), .completed)
             let cell = try XCTUnwrap(cells(in: driver.view).first { $0.dayState?.occurrence.day == boundary[1] })
             XCTAssertEqual(cell.titleLabel.text, mode.isContinuous ? "Mar" : "1")
-            XCTAssertEqual(cell.titleLabel.frame.midY, cell.contentView.bounds.midY, accuracy: 0.01)
+            XCTAssertEqual(cell.titleLabel.frame.midY + cell.subtitleLabel.frame.height * cell.subtitleLabel.alpha / 2,
+                cell.contentView.bounds.midY, accuracy: 0.01)
             let dot = try XCTUnwrap((cell.contentView.layer.sublayers ?? []).first { $0.name == "connectedRange.event" })
             XCTAssertFalse(dot.isHidden)
         }

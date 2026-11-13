@@ -14,6 +14,13 @@ import FSCalendarCore
     public var appearance = FSCalendarAppearance() { didSet { refreshAppearance() } }
     var resolvedAppearance = FSCalendarAppearance()
     var reduceMotionOverride: Bool?
+    // Injectable clock for deterministic year-boundary tests; independent of `today`.
+    var referenceDate: () -> Date = { Date() }
+    var currentYear: Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = configuration.timeZone
+        return calendar.component(.year, from: referenceDate())
+    }
     var reduceMotion: Bool { reduceMotionOverride ?? UIAccessibility.isReduceMotionEnabled }
     public var today: CivilDay? { didSet { reload(dates: Set([oldValue, today].compactMap { $0 })) } }
     public var swipeSelectionEnabled = false { didSet { selectionGesture.isEnabled = swipeSelectionEnabled } }
@@ -88,6 +95,7 @@ import FSCalendarCore
         selectionGesture.minimumPressDuration = 0.25; selectionGesture.isEnabled = false
         collectionView.addGestureRecognizer(selectionGesture)
         NotificationCenter.default.addObserver(self, selector: #selector(clockDidChange), name: UIApplication.significantTimeChangeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(clockDidChange), name: UIApplication.didBecomeActiveNotification, object: nil)
         refreshAppearance()
     }
     deinit { NotificationCenter.default.removeObserver(self) }
@@ -289,7 +297,14 @@ import FSCalendarCore
         lastDeliveredHeight = height
         delegate.calendar(self, preferredHeightDidChange: height, animated: animated)
     }
-    @objc private func clockDidChange() { today = try? CivilDay(date: Date(), timeZone: configuration.timeZone) }
+    @objc private func clockDidChange() {
+        cancelTransition()
+        today = try? CivilDay(date: referenceDate(), timeZone: configuration.timeZone)
+        // All visible month starts may change at New Year, not just the today cell.
+        for case let cell as FSCalendarCell in collectionView.visibleCells {
+            if let occurrence = cell.dayState?.occurrence { configure(cell, occurrence: occurrence) }
+        }
+    }
     func grid(in section: Int) -> CalendarGrid? {
         guard let id = try? engine.page(at: section, scope: renderingMode.scope) else { return nil }
         if let cached = gridCache[id] {
@@ -308,6 +323,15 @@ import FSCalendarCore
             ?? (renderingMode.isContinuous ? 1 : 0)
         var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
         let titleMode = transition.flatMap { $0.isContinuousScope ? $0.targetMode : nil } ?? renderingMode
+        let automaticMonth = content.title == nil && occurrence.day.day == 1
+        cell.hasAutomaticYearSubtitle = false
+        // Retain the year during scope transitions so its opacity and occupied space
+        // can follow month progress instead of disappearing when the target changes.
+        if renderingMode.isContinuous, automaticMonth, content.subtitle == nil,
+           occurrence.day.year != currentYear {
+            content.subtitle = String(format: "%04d", occurrence.day.year)
+            cell.hasAutomaticYearSubtitle = true
+        }
         if titleMode.isContinuous, occurrence.day.day == 1, content.title == nil {
             content.title = monthFormatter.shortStandaloneMonthSymbols[occurrence.day.month - 1]
         }

@@ -377,3 +377,46 @@ circle. The before attachment uses the preserved legacy centering factor on the 
 fixture. These are hosted rendering captures, not full-device UI screenshots.
 Physical-device validation, iOS 16, and manual VoiceOver were not repeated.
 No files were added, so Xcode project regeneration was unnecessary.
+
+## UIKit month-start year subtitles — 2026-11-14
+
+Automatic month-start labels in continuous mode now include a four-digit year when
+outside the current Gregorian year in the configured time zone. Custom titles and
+non-nil subtitles (including empty strings) take precedence. The reference clock is
+independent of the today highlight. Significant time changes, activation, and updated
+time-zone configuration refresh visible labels. During continuous/week transitions,
+the year fades and its occupied space changes with month progress; completion,
+cancellation, reversal, and reuse restore the expected content.
+
+The connected-range example centers the month/year group and keeps events below it.
+Selected event indicators outside the selection fill use the normal event color for
+contrast. Automatic month/year labels can shrink further at accessibility text sizes
+so their complete text remains readable in seven narrow columns. AppKit and paged
+month/week content are unchanged; no public API or new source file was added.
+
+Validated with Xcode 27.2 (27B52) on iPhone 18 Pro / iOS 27.2 Simulator, with
+`SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` and `-parallel-testing-enabled NO`:
+
+| Check | Result | Evidence under ignored `artifacts/month-years/` |
+| --- | --- | --- |
+| Full CalendarShowcaseTests hosted suite | 80 passed | `HostedRetry.xcresult` |
+| CalendarViewTests and SharedDriverTests after event-contrast refinement | 60 passed | `FinalTests.xcresult` |
+| Accessibility-size capture after correcting the test's trait propagation | 1 passed | `LargeTextRetry.xcresult` |
+| Final text-fit refinement: year/custom-content matrix, visual states, and connected-range year layout | 3 passed | `ReadableYearsTests.xcresult` |
+
+Tests use fixed reference dates for current/past/future years, January and other
+months, ordinary days, custom content, empty-subtitle suppression, New Year rollover,
+foreground refresh, and UTC offsets straddling New Year. They also cover selection,
+reuse, event spacing/contrast, connected bands, quarter-step transition opacity and
+geometry, cancellation, and existing animated reversal/presentation-frame contracts.
+
+Inspected hosted rendering captures in `readable-captures/`: plain January/February
+2027 labels match the requested hierarchy; selected labels and event dots remain
+visible; the largest accessibility category renders the full `Jan` and `2027` without
+ellipsis or overlap. These are calendar layer captures, not full-device UI screenshots.
+An initial build failed because the new test tried to mutate an immutable configuration;
+the test now creates replacement configurations. A later accessibility test exposed
+unpropagated view-level traits; using the existing parent/child controller override
+pattern fixed the test setup. Visual inspection then prompted the text-fit refinement.
+Earlier failed results remain retained and are not counted as passing runs.
+Physical-device validation, iOS 16, and manual VoiceOver were not repeated.
