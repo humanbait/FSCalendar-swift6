@@ -200,7 +200,21 @@ import FSCalendarCore
         selectionBackground.frame.origin.y = bounds.midY - selectionBackground.frame.height / 2
         eventIndicator.frame = CGRect(x: bounds.midX - 2,
                                       y: min(bounds.maxY - 4, titleLabel.frame.maxY + subtitleHeight + 3), width: 4, height: 4)
-        let outsideSelection = subtitleHeight > 0 && eventIndicator.frame.maxY > selectionBackground.frame.maxY
+        if !eventIndicator.isHidden, let year = dayState?.occurrence.day.year,
+           subtitleLabel.text == String(format: "%04d", year) {
+            let yearWidth = min(subtitleLabel.sizeThatFits(CGSize(width: .greatestFiniteMagnitude, height: subtitleLabel.frame.height)).width, max(0, bounds.width - 11))
+            let rtl = effectiveUserInterfaceLayoutDirection == .rightToLeft
+            let groupX = max(2, min(bounds.midX - yearWidth / 2 - (rtl ? 7 : 0), bounds.width - 9 - yearWidth))
+            subtitleLabel.frame.origin.x = groupX + (rtl ? 7 : 0)
+            subtitleLabel.frame.size.width = yearWidth
+            let inlineX = rtl ? groupX : subtitleLabel.frame.maxX + 3
+            let inlineY = subtitleLabel.frame.midY - 2
+            eventIndicator.frame.origin.x += (inlineX - eventIndicator.frame.minX) * subtitleLabel.alpha
+            eventIndicator.frame.origin.y += (inlineY - eventIndicator.frame.minY) * subtitleLabel.alpha
+        }
+        let selectedFrame = CGRect(x: bounds.minX, y: selectionBackground.frame.minY,
+                                   width: bounds.width, height: selectionBackground.frame.height)
+        let outsideSelection = subtitleHeight > 0 && !selectedFrame.contains(eventIndicator.frame)
         eventIndicator.backgroundColor = (isSelected && !outsideSelection ? selectedEventColor : normalEventColor)
             .resolvedColor(with: traitCollection).cgColor
         let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,

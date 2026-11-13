@@ -430,3 +430,34 @@ for the 48 passing package tests, 40 distinct passing hosted tests across runs,
 inspected capture evidence, and the UI automation startup failure. Final captures
 use explicitly labeled bitmap fallbacks because WindowServer window capture was
 unavailable; live native-window inspection also confirmed the continuous layout.
+
+## Inline year event indicators on UIKit and AppKit — 2026-11-14
+
+Event dots now follow automatic year subtitles on the same line, with a 3-point gap,
+in both native renderers and connected-range showcases. The year stays centered below
+the month when space permits; narrow columns reserve room for the complete dot group.
+RTL places the dots on the opposite side. Ordinary dates and custom non-year subtitles
+keep below-text events. Scope transitions interpolate the event position back to the
+week layout. Selected dots use the selected color only inside the selection fill;
+standard circle checks include the rounded boundary, not just its bounding rectangle.
+
+Validated using Xcode 27.2 (27B52), Swift 6 mode, warnings treated as errors, iPhone
+18 Pro / iOS 27.2 Simulator, and macOS 27.2 arm64. Evidence is under ignored `artifacts/`:
+
+- `inline-year-ios.xcresult`: 60 UIKit/driver tests passed, one test failed because its
+  new inline-position assertion also checked hidden indicators with zero events.
+  The assertion now applies only to visible indicators; the corrected test passed in
+  `inline-year-ios-focused.xcresult`.
+- `inline-year-ios-final.xcresult`: all three focused tests passed after preserving
+  year centering and refining selected-dot contrast. Covers visual states, RTL,
+  zero/one/three events, narrow columns, reuse, and connected-range placement.
+- `inline-year-20261113T215321Z/`: all 49 package tests and 41 macOS hosted tests passed.
+- `inline-year-final-20261113T215530Z/`: all 49 package tests and 15 hosted content/scenario
+  tests passed, with refreshed light/dark captures after the centering/contrast refinement.
+
+Inspected iOS calendar captures and Mac light/dark bitmap captures show indicators
+beside the year without covering it. Mac WindowServer capture remains unavailable,
+so its retained images are explicitly labeled bitmap fallbacks. Physical iOS device,
+macOS UI automation, minimum OS versions, and manual VoiceOver were not repeated.
+Existing transition and connected-range suites passed. No source files were added,
+so Xcode project regeneration was unnecessary.

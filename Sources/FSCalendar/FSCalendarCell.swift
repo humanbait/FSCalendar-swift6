@@ -112,8 +112,26 @@ import FSCalendarCore
         let centeredDotY = min(max(0, bounds.height - dotHeight), centeredTextBottom + 2)
         let dotY = legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
         eventStack.frame = CGRect(x: (bounds.width - dotWidth) / 2, y: dotY, width: dotWidth, height: dotHeight)
+        if hasAutomaticYearSubtitle, dotCount > 0 {
+            let gap: CGFloat = 3
+            let yearWidth = min(subtitleLabel.sizeThatFits(CGSize(width: .greatestFiniteMagnitude, height: subtitleHeight)).width,
+                                max(0, bounds.width - 4 - gap - dotWidth))
+            let rtl = effectiveUserInterfaceLayoutDirection == .rightToLeft
+            let space = gap + dotWidth
+            let groupX = max(2, min(bounds.midX - yearWidth / 2 - (rtl ? space : 0), bounds.width - 2 - yearWidth - space))
+            subtitleLabel.frame.origin.x = groupX + (rtl ? dotWidth + gap : 0)
+            subtitleLabel.frame.size.width = yearWidth
+            let inlineX = rtl ? groupX : subtitleLabel.frame.maxX + gap
+            let inlineY = subtitleLabel.frame.midY - dotHeight / 2
+            eventStack.frame.origin.x += (inlineX - eventStack.frame.minX) * continuousCenteringProgress
+            eventStack.frame.origin.y += (inlineY - eventStack.frame.minY) * continuousCenteringProgress
+        }
         if hasAutomaticYearSubtitle {
-            let insideSelection = eventStack.frame.maxY <= selectionBackground.frame.maxY
+            let shape = UIBezierPath(roundedRect: selectionBackground.frame, cornerRadius: radius ?? side / 2)
+            let insideSelection = [CGPoint(x: eventStack.frame.minX, y: eventStack.frame.minY),
+                                   CGPoint(x: eventStack.frame.maxX, y: eventStack.frame.minY),
+                                   CGPoint(x: eventStack.frame.minX, y: eventStack.frame.maxY),
+                                   CGPoint(x: eventStack.frame.maxX, y: eventStack.frame.maxY)].allSatisfy(shape.contains)
             for dot in eventStack.arrangedSubviews {
                 dot.backgroundColor = isSelected && insideSelection ? selectedEventColor : normalEventColor
             }

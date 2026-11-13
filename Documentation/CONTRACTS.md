@@ -41,7 +41,10 @@ omitted when a custom title or any non-nil subtitle (including an empty string) 
 supplied. The reference year comes from the clock, independently of the overridable
 `today` highlight; visible labels refresh on significant time changes and activation.
 The month/year group is centered, and its year fades with continuous/week transitions.
-Event dots below the selection fill retain the normal event color for visibility.
+When an automatic year is visible, its event dots follow the year on the same line,
+with a 3-point gap. The year stays centered under the month when space permits, and dots mirror in RTL.
+Other subtitles and ordinary dates retain their below-text event placement. Dots
+outside the selection fill retain the normal event color for visibility.
 AppKit also refreshes after wake and fits automatic month/year text to narrow columns
 from the original configured fonts, avoiding cumulative shrinking on resize.
 

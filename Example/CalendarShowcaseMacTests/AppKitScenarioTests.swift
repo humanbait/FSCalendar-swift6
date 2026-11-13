@@ -37,7 +37,7 @@ final class AppKitScenarioTests: XCTestCase {
                     XCTAssertEqual(item.titleLabel.frame.union(item.subtitleLabel.frame).midY, item.view.bounds.midY, accuracy: 0.001)
                     if let dot = item.view.layer?.sublayers?.first(where: { $0.name == "connectedRange.event" }) {
                         XCTAssertFalse(dot.isHidden)
-                        XCTAssertGreaterThanOrEqual(dot.frame.minY, item.subtitleLabel.frame.maxY)
+                        XCTAssertEqual(dot.frame.midY, item.subtitleLabel.frame.midY, accuracy: 0.001)
                         XCTAssertLessThanOrEqual(dot.frame.maxY, item.view.bounds.height)
                     }
                     window.displayIfNeeded(); CATransaction.flush()

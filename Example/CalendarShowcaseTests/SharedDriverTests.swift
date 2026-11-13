@@ -21,7 +21,10 @@ final class SharedDriverTests: XCTestCase {
                     XCTAssertEqual(cell.titleLabel.frame.union(cell.subtitleLabel.frame).midY, height / 2, accuracy: 0.001)
                     XCTAssertEqual(cell.selectionBackground.frame.midY, height / 2, accuracy: 0.001)
                     let dot = try XCTUnwrap(cell.contentView.layer.sublayers?.first { $0.name == "connectedRange.event" })
-                    XCTAssertGreaterThanOrEqual(dot.frame.minY, cell.subtitleLabel.frame.maxY)
+                    if events > 0 {
+                        XCTAssertEqual(dot.frame.midY, cell.subtitleLabel.frame.midY, accuracy: 0.001)
+                        XCTAssertEqual(dot.frame.minX - cell.subtitleLabel.frame.maxX, 3, accuracy: 0.001)
+                    }
                     XCTAssertLessThanOrEqual(dot.frame.maxY, height)
                     XCTAssertEqual(dot.isHidden, events == 0)
                 }

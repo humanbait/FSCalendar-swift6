@@ -37,6 +37,40 @@ extension FSCalendar: RendererSelectionContract {}
 }
 
 final class CalendarViewTests: XCTestCase {
+    @MainActor func testYearEventsStayInlineAndMirrorInRTL() throws {
+        let day = try CivilDay(year: 2027, month: 1, day: 1)
+        let occurrence = try XCTUnwrap(CalendarEngine(configuration: CalendarConfiguration()).continuousMonthGrid(containing: day).occurrences.first)
+        let cell = FSCalendarCell()
+        for width: CGFloat in [35.5, 56, 110] {
+            cell.frame = CGRect(x: 0, y: 0, width: width, height: 60)
+            for rtl in [false, true] {
+                cell.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+                for events in [0, 1, 3] {
+                    cell.continuousCenteringProgress = 1; cell.hasAutomaticYearSubtitle = true
+                    cell.apply(content: DayContent(title: "Jan", subtitle: "2027", numberOfEvents: events),
+                        state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
+                        appearance: FSCalendarAppearance(), style: DayAppearance())
+                    cell.setNeedsLayout(); cell.layoutIfNeeded()
+                    if events > 0 {
+                        let dots = try XCTUnwrap(cell.contentView.subviews.compactMap { $0 as? UIStackView }.first)
+                        let dotFrame = dots.frame
+                        XCTAssertEqual(dotFrame.midY, cell.subtitleLabel.frame.midY, accuracy: 0.001)
+                        XCTAssertEqual(rtl ? cell.subtitleLabel.frame.minX - dotFrame.maxX : dotFrame.minX - cell.subtitleLabel.frame.maxX, 3, accuracy: 0.001)
+                        let group = cell.subtitleLabel.frame.union(dotFrame)
+                        if cell.subtitleLabel.frame.width + 2 * (dotFrame.width + 3) <= width - 4 {
+                            XCTAssertEqual(cell.subtitleLabel.frame.midX, width / 2, accuracy: 0.001)
+                        }
+                        XCTAssertGreaterThanOrEqual(group.minX, 0)
+                        XCTAssertLessThanOrEqual(group.maxX, width)
+                    } else {
+                        XCTAssertEqual(cell.subtitleLabel.frame.midX, width / 2, accuracy: 0.001)
+                    }
+                    cell.prepareForReuse()
+                }
+            }
+        }
+    }
+
     @MainActor func testAutomaticMonthYearsRespectClockModeAndCustomContent() throws {
         let view = try make()
         view.referenceDate = { Date(timeIntervalSince1970: 1767225600) } // 2026-01-01 UTC
@@ -160,7 +194,10 @@ final class CalendarViewTests: XCTestCase {
             XCTAssertEqual(cell.subtitleLabel.text, "2027")
             XCTAssertEqual(cell.titleLabel.frame.union(cell.subtitleLabel.frame).midY, cell.bounds.midY, accuracy: 0.001)
             let dots = try XCTUnwrap(cell.contentView.subviews.compactMap { $0 as? UIStackView }.first)
-            XCTAssertGreaterThanOrEqual(dots.frame.minY, cell.subtitleLabel.frame.maxY)
+            if events > 0 {
+                XCTAssertEqual(dots.frame.midY, cell.subtitleLabel.frame.midY, accuracy: 0.001)
+                XCTAssertEqual(dots.frame.minX - cell.subtitleLabel.frame.maxX, 3, accuracy: 0.001)
+            }
             XCTAssertLessThanOrEqual(dots.frame.maxY, cell.bounds.maxY)
             if selected && dots.frame.maxY > cell.selectionBackground.frame.maxY {
                 XCTAssertEqual(dots.arrangedSubviews.first?.backgroundColor, view.appearance.eventColor)

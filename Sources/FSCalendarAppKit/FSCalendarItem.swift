@@ -69,6 +69,9 @@ import FSCalendarCore
         super.viewDidLayout()
         let size = view.bounds.size
         let imageWidth: CGFloat = dayImageView.image == nil ? 0 : 16
+        let count = dots.filter { !$0.isHidden }.count
+        let dotWidth = CGFloat(max(0, count * 7 - 3))
+        let inlineSpace = hasAutomaticYearSubtitle && count > 0 ? dotWidth + 3 : 0
         if hasAutomaticYearSubtitle {
             originalTitleFont = originalTitleFont ?? titleLabel.font
             originalSubtitleFont = originalSubtitleFont ?? subtitleLabel.font
@@ -79,7 +82,7 @@ import FSCalendarCore
                 return NSFont(descriptor: original.fontDescriptor, size: original.pointSize * scale)
             }
             titleLabel.font = fitted(titleLabel, original: originalTitleFont, width: size.width - imageWidth - 4, height: size.height * 0.45)
-            subtitleLabel.font = fitted(subtitleLabel, original: originalSubtitleFont, width: size.width - 4, height: size.height * 0.25)
+            subtitleLabel.font = fitted(subtitleLabel, original: originalSubtitleFont, width: size.width - 4 - inlineSpace, height: size.height * 0.25)
         }
         let subtitleProgress = hasAutomaticYearSubtitle ? continuousCenteringProgress : 1
         subtitleLabel.alphaValue = subtitleProgress
@@ -108,11 +111,28 @@ import FSCalendarCore
         let legacyDotY = (contentHeight + diameter) / 2 + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
         let centeredDotY = min(max(0, size.height - dotHeight), (size.height + titleHeight + occupiedSubtitleHeight) / 2 + 2)
         let dotY = legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
-        let count = dots.filter { !$0.isHidden }.count
+        var inlineX = size.width / 2 - dotWidth / 2
+        if hasAutomaticYearSubtitle, count > 0 {
+            let yearWidth = min(subtitleLabel.intrinsicContentSize.width, max(0, size.width - 4 - inlineSpace))
+            let rtl = view.userInterfaceLayoutDirection == .rightToLeft
+            let groupX = max(2, min(size.width / 2 - yearWidth / 2 - (rtl ? inlineSpace : 0), size.width - 2 - yearWidth - inlineSpace))
+            subtitleLabel.frame.origin.x = groupX + (rtl ? inlineSpace : 0)
+            subtitleLabel.frame.size.width = yearWidth
+            inlineX = rtl ? groupX : subtitleLabel.frame.maxX + 3
+        }
         for (index, dot) in dots.enumerated() {
             dot.frame = NSRect(x: size.width / 2 - CGFloat(count * 7 - 3) / 2 + CGFloat(index * 7), y: dotY, width: 4, height: dotHeight)
+            if hasAutomaticYearSubtitle, count > 0 {
+                let targetX = inlineX + CGFloat(index * 7)
+                let targetY = subtitleLabel.frame.midY - dotHeight / 2
+                dot.frame.origin.x += (targetX - dot.frame.minX) * continuousCenteringProgress
+                dot.frame.origin.y += (targetY - dot.frame.minY) * continuousCenteringProgress
+            }
             dot.layer?.cornerRadius = dotHeight / 2
-            let insideSelection = continuousCenteringProgress > 0 && dot.frame.maxY <= selectionBackground.frame.maxY
+            let shape = NSBezierPath(roundedRect: selectionBackground.frame, xRadius: radius ?? diameter / 2, yRadius: radius ?? diameter / 2)
+            let insideSelection = continuousCenteringProgress > 0 &&
+                [CGPoint(x: dot.frame.minX, y: dot.frame.minY), CGPoint(x: dot.frame.maxX, y: dot.frame.minY),
+                 CGPoint(x: dot.frame.minX, y: dot.frame.maxY), CGPoint(x: dot.frame.maxX, y: dot.frame.maxY)].allSatisfy(shape.contains)
             dot.layer?.backgroundColor = (isSelected && insideSelection ? selectedEventColor : normalEventColor).cgColor
         }
     }

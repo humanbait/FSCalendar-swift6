@@ -90,8 +90,9 @@ The reference year uses the actual clock in the configured time zone, independen
 of `today`, and refreshes on day/clock changes, activation, wake, and configuration updates.
 The year fades and its occupied space follows continuous/week transition progress.
 Automatic month/year fonts fit narrow columns and larger configured fonts without
-cumulative shrinkage on resize. Events sit below the text; dots outside a selected fill
-use the normal event color to remain visible. Paged month/week geometry is unchanged.
+cumulative shrinkage on resize. Events follow automatic years on the same line with
+a 3-point gap; the year stays centered where space permits and dots mirror in RTL. Other cells keep
+below-text dots. Dots outside a selected fill use the normal event color to remain visible. Paged month/week geometry is unchanged.
 Set `calendarAppearance.monthSeparatorColor` and `monthSeparatorCornerRadius` (default 8;
 zero for square bends) to customize the rules. Odd months use `backgroundColor`; even
 months use the adaptive neutral `alternatingMonthBackgroundColor`. Set the latter to

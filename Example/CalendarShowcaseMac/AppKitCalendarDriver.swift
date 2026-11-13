@@ -186,7 +186,26 @@ import FSCalendarCore
         selectionBackground.frame.origin.y = bounds.midY - selectionBackground.frame.height / 2
         eventIndicator.frame = CGRect(x: bounds.midX - 2,
                                       y: min(bounds.maxY - 4, titleLabel.frame.maxY + subtitleHeight + 3), width: 4, height: 4)
-        let outsideSelection = subtitleHeight > 0 && eventIndicator.frame.maxY > selectionBackground.frame.maxY
+        if !eventIndicator.isHidden, let year = dayState?.occurrence.day.year,
+           subtitleLabel.stringValue == String(format: "%04d", year) {
+            if let font = subtitleLabel.font {
+                let measured = subtitleLabel.intrinsicContentSize.width
+                let scale = min(1, max(1, bounds.width - 11) / max(1, measured))
+                subtitleLabel.font = NSFont(descriptor: font.fontDescriptor, size: font.pointSize * scale)
+            }
+            let yearWidth = min(subtitleLabel.intrinsicContentSize.width, max(0, bounds.width - 11))
+            let rtl = view.userInterfaceLayoutDirection == .rightToLeft
+            let groupX = max(2, min(bounds.midX - yearWidth / 2 - (rtl ? 7 : 0), bounds.width - 9 - yearWidth))
+            subtitleLabel.frame.origin.x = groupX + (rtl ? 7 : 0)
+            subtitleLabel.frame.size.width = yearWidth
+            let inlineX = rtl ? groupX : subtitleLabel.frame.maxX + 3
+            let inlineY = subtitleLabel.frame.midY - 2
+            eventIndicator.frame.origin.x += (inlineX - eventIndicator.frame.minX) * subtitleLabel.alphaValue
+            eventIndicator.frame.origin.y += (inlineY - eventIndicator.frame.minY) * subtitleLabel.alphaValue
+        }
+        let selectedFrame = CGRect(x: bounds.minX, y: selectionBackground.frame.minY,
+                                   width: bounds.width, height: selectionBackground.frame.height)
+        let outsideSelection = subtitleHeight > 0 && !selectedFrame.contains(eventIndicator.frame)
         eventIndicator.backgroundColor = (isSelected && !outsideSelection ? selectedEventColor : normalEventColor).cgColor
         let allCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner,
                                         .layerMaxXMinYCorner, .layerMaxXMaxYCorner]

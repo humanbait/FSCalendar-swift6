@@ -18,6 +18,41 @@ import FSCalendarCore
     func calendar(_ calendar: FSCalendarView, contentFor day: CivilDay) -> DayContent { content }
 }
 final class CalendarContentTests: XCTestCase {
+    @MainActor func testYearEventsStayInlineAndMirrorInRTL() throws {
+        _ = NSApplication.shared
+        let day = try CivilDay(year: 2027, month: 1, day: 1)
+        let occurrence = try XCTUnwrap(CalendarEngine(configuration: CalendarConfiguration()).continuousMonthGrid(containing: day).occurrences.first)
+        let cell = FSCalendarItem()
+        for width: CGFloat in [35.5, 56, 110] {
+            cell.view.frame = CGRect(x: 0, y: 0, width: width, height: 60)
+            for rtl in [false, true] {
+                cell.view.userInterfaceLayoutDirection = rtl ? .rightToLeft : .leftToRight
+                for events in [0, 1, 3] {
+                    cell.continuousCenteringProgress = 1; cell.hasAutomaticYearSubtitle = true
+                    cell.apply(content: DayContent(title: "Jan", subtitle: "2027", numberOfEvents: events),
+                        state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
+                        appearance: FSCalendarAppearance(), style: DayAppearance())
+                    cell.viewDidLayout()
+                    if events > 0 {
+                        let dots = cell.view.subviews.filter { $0 !== cell.selectionBackground && !($0 is NSTextField) && !($0 is NSImageView) && !$0.isHidden }
+                        let dotFrame = dots.reduce(CGRect.null) { $0.union($1.frame) }
+                        XCTAssertEqual(dotFrame.midY, cell.subtitleLabel.frame.midY, accuracy: 0.001)
+                        XCTAssertEqual(rtl ? cell.subtitleLabel.frame.minX - dotFrame.maxX : dotFrame.minX - cell.subtitleLabel.frame.maxX, 3, accuracy: 0.001)
+                        let group = cell.subtitleLabel.frame.union(dotFrame)
+                        if cell.subtitleLabel.frame.width + 2 * (dotFrame.width + 3) <= width - 4 {
+                            XCTAssertEqual(cell.subtitleLabel.frame.midX, width / 2, accuracy: 0.001)
+                        }
+                        XCTAssertGreaterThanOrEqual(group.minX, 0)
+                        XCTAssertLessThanOrEqual(group.maxX, width)
+                    } else {
+                        XCTAssertEqual(cell.subtitleLabel.frame.midX, width / 2, accuracy: 0.001)
+                    }
+                    cell.prepareForReuse()
+                }
+            }
+        }
+    }
+
     @MainActor func testContinuousCenteringAndYearContentPrecedence() throws {
         _ = NSApplication.shared
         let calendar = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 400))
@@ -83,7 +118,7 @@ final class CalendarContentTests: XCTestCase {
                     let dots = item.view.subviews.filter { $0 !== item.selectionBackground && !($0 is NSTextField) && !($0 is NSImageView) && !$0.isHidden }
                     XCTAssertEqual(dots.count, 3)
                     for dot in dots {
-                        XCTAssertGreaterThanOrEqual(dot.frame.minY, item.subtitleLabel.frame.maxY)
+                        XCTAssertEqual(dot.frame.midY, item.subtitleLabel.frame.midY, accuracy: 0.001)
                         XCTAssertLessThanOrEqual(dot.frame.maxY, size.height)
                     }
                 }
