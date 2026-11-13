@@ -420,3 +420,13 @@ unpropagated view-level traits; using the existing parent/child controller overr
 pattern fixed the test setup. Visual inspection then prompted the text-fit refinement.
 Earlier failed results remain retained and are not counted as passing runs.
 Physical-device validation, iOS 16, and manual VoiceOver were not repeated.
+
+## AppKit continuous-row and year-label parity — 2026-11-14
+
+AppKit now implements continuous-row centering, non-current-year month subtitles,
+clock/lifecycle refresh, event contrast, fitting of automatic labels, and matching
+connected-range/transition behavior. See [Mac validation](MACOS-VALIDATION.md#continuous-row-centering-and-month-start-years--2026-11-14)
+for the 48 passing package tests, 40 distinct passing hosted tests across runs,
+inspected capture evidence, and the UI automation startup failure. Final captures
+use explicitly labeled bitmap fallbacks because WindowServer window capture was
+unavailable; live native-window inspection also confirmed the continuous layout.

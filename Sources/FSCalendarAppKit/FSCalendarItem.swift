@@ -13,6 +13,14 @@ import FSCalendarCore
     public private(set) var dayState: DayState?
     private let dots = (0..<3).map { _ in NSView() }
     private var radius: CGFloat?
+    var continuousCenteringProgress: CGFloat = 0 {
+        didSet { if oldValue != continuousCenteringProgress { view.needsLayout = true } }
+    }
+    var hasAutomaticYearSubtitle = false
+    private var originalTitleFont: NSFont?
+    private var originalSubtitleFont: NSFont?
+    private var normalEventColor: NSColor = .clear
+    private var selectedEventColor: NSColor = .clear
     public override func loadView() {
         view = CalendarDayView(frame: .zero); view.wantsLayer = true
         selectionBackground.wantsLayer = true
@@ -32,10 +40,15 @@ import FSCalendarCore
         titleLabel.stringValue = content.title ?? String(state.occurrence.day.day)
         subtitleLabel.stringValue = content.subtitle ?? ""
         titleLabel.font = appearance.titleFont; subtitleLabel.font = appearance.subtitleFont
+        originalTitleFont = nil; originalSubtitleFont = nil
+        subtitleLabel.alphaValue = hasAutomaticYearSubtitle ? continuousCenteringProgress : 1
+        normalEventColor = style.eventColor ?? appearance.eventColor
+        selectedEventColor = appearance.selectedTitleColor
         titleLabel.textColor = state.isSelected ? appearance.selectedTitleColor :
             (!state.occurrence.isSelectable ? appearance.disabledColor :
              (style.titleColor ?? (state.occurrence.position == .current ? appearance.titleColor : appearance.placeholderColor)))
-        subtitleLabel.textColor = style.subtitleColor ?? appearance.subtitleColor
+        subtitleLabel.textColor = hasAutomaticYearSubtitle && state.isSelected
+            ? appearance.selectedTitleColor : (style.subtitleColor ?? appearance.subtitleColor)
         dayImageView.image = content.image
         selectionBackground.layer?.backgroundColor = (state.isSelected ? (style.selectedFillColor ?? appearance.selectionColor) : (style.fillColor ?? .clear)).cgColor
         selectionBackground.layer?.borderColor = (style.borderColor ?? (state.isToday ? appearance.todayColor : .clear)).cgColor
@@ -55,31 +68,58 @@ import FSCalendarCore
     open override func viewDidLayout() {
         super.viewDidLayout()
         let size = view.bounds.size
-        let titleHeight = titleLabel.intrinsicContentSize.height
-        let subtitleHeight = subtitleLabel.stringValue.isEmpty ? 0 : subtitleLabel.intrinsicContentSize.height
-        // Match the legacy cell: text and shape share the upper five-sixths.
+        let imageWidth: CGFloat = dayImageView.image == nil ? 0 : 16
+        if hasAutomaticYearSubtitle {
+            originalTitleFont = originalTitleFont ?? titleLabel.font
+            originalSubtitleFont = originalSubtitleFont ?? subtitleLabel.font
+            func fitted(_ label: NSTextField, original: NSFont?, width: CGFloat, height: CGFloat) -> NSFont? {
+                guard let original else { return nil }
+                let measured = (label.stringValue as NSString).size(withAttributes: [.font: original])
+                let scale = min(1, max(0.01, width - 4) / max(1, measured.width), max(0.01, height - 2) / max(1, measured.height))
+                return NSFont(descriptor: original.fontDescriptor, size: original.pointSize * scale)
+            }
+            titleLabel.font = fitted(titleLabel, original: originalTitleFont, width: size.width - imageWidth - 4, height: size.height * 0.45)
+            subtitleLabel.font = fitted(subtitleLabel, original: originalSubtitleFont, width: size.width - 4, height: size.height * 0.25)
+        }
+        let subtitleProgress = hasAutomaticYearSubtitle ? continuousCenteringProgress : 1
+        subtitleLabel.alphaValue = subtitleProgress
+        let hasSubtitle = !subtitleLabel.stringValue.isEmpty
+        let naturalTitleHeight = titleLabel.intrinsicContentSize.height
+        let naturalSubtitleHeight = hasSubtitle ? subtitleLabel.intrinsicContentSize.height : 0
+        let titleLimit = size.height * (hasSubtitle || imageWidth > 0 ? 0.45 : 0.7)
+        let titleHeight = naturalTitleHeight + (min(naturalTitleHeight, titleLimit) - naturalTitleHeight) * continuousCenteringProgress
+        let subtitleHeight = naturalSubtitleHeight + (min(naturalSubtitleHeight, size.height * 0.25) - naturalSubtitleHeight) * continuousCenteringProgress
+        let occupiedSubtitleHeight = subtitleHeight * subtitleProgress
+        // Keep the legacy circle size while centering continuous content.
         let contentHeight = size.height * 5 / 6
+        let offset = size.height / 12 * continuousCenteringProgress
         let standardDiameter: CGFloat = 100 / 3
         let availableDiameter = max(0, min(size.width, contentHeight))
         let diameter = availableDiameter - max(0, availableDiameter - standardDiameter) / 2
-        selectionBackground.frame = NSRect(x: (size.width - diameter) / 2, y: (contentHeight - diameter) / 2, width: diameter, height: diameter)
+        selectionBackground.frame = NSRect(x: (size.width - diameter) / 2, y: (contentHeight - diameter) / 2 + offset, width: diameter, height: diameter)
         selectionBackground.layer?.cornerRadius = radius ?? max(0, diameter / 2)
-        let top = (contentHeight - titleHeight - subtitleHeight) / 2
-        let imageWidth: CGFloat = dayImageView.image == nil ? 0 : 16
+        let top = (contentHeight - titleHeight - occupiedSubtitleHeight) / 2 + offset
         titleLabel.frame = NSRect(x: 2, y: top, width: size.width - imageWidth - 4, height: titleHeight)
-        dayImageView.frame = NSRect(x: size.width - 19, y: top + 1, width: imageWidth, height: 14)
+        let imageY = top + 1 + ((titleHeight - 14) / 2 - 1) * continuousCenteringProgress
+        dayImageView.frame = NSRect(x: size.width - 19, y: imageY, width: imageWidth, height: 14)
         subtitleLabel.frame = NSRect(x: 2, y: top + titleHeight, width: size.width - 4, height: subtitleHeight)
         let eventSize = diameter / 6
         let dotHeight = min(4, eventSize * 0.83)
-        let dotY = selectionBackground.frame.maxY + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
+        let legacyDotY = (contentHeight + diameter) / 2 + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
+        let centeredDotY = min(max(0, size.height - dotHeight), (size.height + titleHeight + occupiedSubtitleHeight) / 2 + 2)
+        let dotY = legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
         let count = dots.filter { !$0.isHidden }.count
         for (index, dot) in dots.enumerated() {
             dot.frame = NSRect(x: size.width / 2 - CGFloat(count * 7 - 3) / 2 + CGFloat(index * 7), y: dotY, width: 4, height: dotHeight)
             dot.layer?.cornerRadius = dotHeight / 2
+            let insideSelection = continuousCenteringProgress > 0 && dot.frame.maxY <= selectionBackground.frame.maxY
+            dot.layer?.backgroundColor = (isSelected && insideSelection ? selectedEventColor : normalEventColor).cgColor
         }
     }
     open override func prepareForReuse() {
         super.prepareForReuse(); dayState = nil; isSelected = false
+        continuousCenteringProgress = 0; hasAutomaticYearSubtitle = false
+        originalTitleFont = nil; originalSubtitleFont = nil; subtitleLabel.alphaValue = 1
         (view as? CalendarDayView)?.owner = nil; (view as? CalendarDayView)?.day = nil
         view.layer?.borderWidth = 0
         titleLabel.stringValue = ""; subtitleLabel.stringValue = ""; dayImageView.image = nil

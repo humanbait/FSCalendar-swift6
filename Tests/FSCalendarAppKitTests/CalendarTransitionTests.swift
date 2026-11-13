@@ -83,6 +83,7 @@ final class CalendarTransitionTests: XCTestCase {
         for rtl in [false, true] {
             for anchor in [try CivilDay(year: 2024, month: 3, day: 1), try CivilDay(year: 2025, month: 1, day: 1)] {
                 let view = try make(), spy = TransitionSpy()
+                view.referenceDate = { Date(timeIntervalSince1970: 1767225600) }
                 try view.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 0)!,
                     locale: Locale(identifier: "en_US_POSIX"), selectionMode: .multiple))
                 var appearance = view.calendarAppearance; appearance.rowHeight = 47.25
@@ -137,6 +138,14 @@ final class CalendarTransitionTests: XCTestCase {
                         XCTAssertEqual(try frame(anchor).minY, expectedY, accuracy: pixel)
                         XCTAssertEqual(try frame(previous).minY, try frame(anchor).minY, accuracy: pixel)
                         XCTAssertEqual(try cell(anchor).view.alphaValue, 1, accuracy: 0.01)
+                        let content = try cell(anchor)
+                        content.view.layoutSubtreeIfNeeded()
+                        XCTAssertEqual(content.subtitleLabel.alphaValue, context.monthProgress, accuracy: 0.001)
+                        XCTAssertEqual(content.subtitleLabel.stringValue, String(anchor.year))
+                        XCTAssertEqual(content.selectionBackground.frame.midY,
+                            content.view.bounds.height * (5 + context.monthProgress) / 12, accuracy: 0.001)
+                        XCTAssertEqual(content.titleLabel.frame.midY + content.subtitleLabel.frame.height * context.monthProgress / 2,
+                            content.selectionBackground.frame.midY, accuracy: 0.001)
                         XCTAssertEqual(try cell(previous).view.alphaValue, 1, accuracy: 0.01)
                         let attributes = view.calendarLayout.layoutAttributesForElements(in: view.collectionView.visibleRect)
                         for attribute in attributes where attribute.representedElementCategory == .item {

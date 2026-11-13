@@ -28,6 +28,12 @@ import FSCalendarCore
     var renderingPage: CivilDay { transition?.renderPage ?? page }
     var lastMonthAxis: CalendarScrollAxis = .horizontal
     let animationDriver = CalendarAnimationDriver()
+    var referenceDate: () -> Date = { Date() }
+    var currentYear: Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = configuration.timeZone
+        return calendar.component(.year, from: referenceDate())
+    }
     var reduceMotionOverride: Bool?
     var reduceMotion: Bool { reduceMotionOverride ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     public override var isFlipped: Bool { true }
@@ -76,9 +82,24 @@ import FSCalendarCore
         titleLabel.alignment = .center; titleLabel.setAccessibilityIdentifier("calendar.heading")
         for label in weekdayLabels { label.alignment = .center; addSubview(label) }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(accessibilityDisplayChanged), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemClockDidChange,
+                     .NSSystemTimeZoneDidChange, NSApplication.didBecomeActiveNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(clockDidChange), name: name, object: nil)
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(clockDidChange), name: NSWorkspace.didWakeNotification, object: nil)
         setAccessibilityIdentifier("calendar"); rebuild()
     }
-    deinit { NotificationCenter.default.removeObserver(self) }
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+    @objc private func clockDidChange() {
+        cancelTransition()
+        today = try? CivilDay(date: referenceDate(), timeZone: configuration.timeZone)
+        for case let item as FSCalendarItem in collectionView.visibleItems() {
+            if let occurrence = item.dayState?.occurrence { configure(item, occurrence: occurrence) }
+        }
+    }
     public func apply(configuration: CalendarConfiguration) throws {
         guard !isMutating else { throw CalendarError.reentrantMutation }
         let replacement = try CalendarEngine(configuration: configuration)
@@ -206,7 +227,15 @@ import FSCalendarCore
         }
     }
     func configure(_ item: FSCalendarItem, occurrence: DayOccurrence) {
+        item.continuousCenteringProgress = transition.flatMap { $0.isContinuousScope ? $0.monthProgress : nil }
+            ?? (renderingMode.isContinuous ? 1 : 0)
         var content = dataSource?.calendar(self, contentFor: occurrence.day) ?? DayContent()
+        item.hasAutomaticYearSubtitle = false
+        if renderingMode.isContinuous, occurrence.day.day == 1, content.title == nil,
+           content.subtitle == nil, occurrence.day.year != currentYear {
+            content.subtitle = String(format: "%04d", occurrence.day.year)
+            item.hasAutomaticYearSubtitle = true
+        }
         if let context = transition {
             // A scrolled-out title may be recycled while its surrounding row fades.
             context.titleFades.removeAll { fade in

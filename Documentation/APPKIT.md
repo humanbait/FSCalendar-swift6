@@ -82,6 +82,16 @@ Paged trackpad input accumulates and snaps once scrolling settles. Continuous mo
 native NSScrollView scrolling and shared boundary weeks with no repeated dates. Weekday
 labels remain visible; the month/year heading is hidden without reserving its height.
 First days use localized short month names, and rounded stepped lines separate months.
+Continuous rows center the text group and selection/today circle without enlarging the
+circle. Automatic month labels outside the current Gregorian year show a four-digit
+year underneath, using subtitle styling (selected-title color when selected). A custom
+title or any non-nil subtitle, including an empty string, suppresses the automatic year.
+The reference year uses the actual clock in the configured time zone, independently
+of `today`, and refreshes on day/clock changes, activation, wake, and configuration updates.
+The year fades and its occupied space follows continuous/week transition progress.
+Automatic month/year fonts fit narrow columns and larger configured fonts without
+cumulative shrinkage on resize. Events sit below the text; dots outside a selected fill
+use the normal event color to remain visible. Paged month/week geometry is unchanged.
 Set `calendarAppearance.monthSeparatorColor` and `monthSeparatorCornerRadius` (default 8;
 zero for square bends) to customize the rules. Odd months use `backgroundColor`; even
 months use the adaptive neutral `alternatingMonthBackgroundColor`. Set the latter to

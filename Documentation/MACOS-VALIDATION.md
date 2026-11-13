@@ -169,3 +169,54 @@ No source files were added, so Xcode project regeneration was unnecessary. UIKit
 Core were unchanged. Exact Swift 6.2, macOS 13, and manual VoiceOver remain separate
 release checks; the automated Reduce Motion override does not establish a manual
 system-preference observation.
+
+## Continuous-row centering and month-start years — 2026-11-14
+
+AppKit now matches UIKit's continuous-row alignment and automatic month/year labels.
+Text groups and unchanged-size selection/today circles are centered, event dots remain
+below text and within rows, and selected dots outside the fill use the normal event
+color. The connected-range item handles subtitles as a group. AppKit fits automatic
+month/year fonts from their original configured fonts on each resize, and retains
+custom content, paged geometry, and full-date accessibility labels.
+
+A deterministic clock supplies the current Gregorian year in the configured time zone,
+independently of the today highlight. Day/clock/time-zone notifications, activation,
+wake, and configuration replacement refresh labels. Year opacity, occupied subtitle
+space, cell centering, and outgoing title placement follow the scope timeline.
+
+Validated on macOS 27.2 arm64 with Xcode 27.2 (27B52), Swift 6.4.2, Swift 6 mode,
+and warnings treated as errors:
+
+| Check | Result | Evidence under ignored `artifacts/` |
+| --- | --- | --- |
+| Full `test-macos.sh --destination 'platform=macOS,arch=arm64' --label mac-parity` | 48 package tests passed; 39 hosted tests passed; capture test failed and UI runner could not initialize | `mac-parity-20261113T212536Z/` |
+| Package plus hosted retry after final layout/transition assertions | 48 package tests passed; 39 hosted tests passed; capture test still failed | `mac-parity-final-20261113T212844Z/` |
+| Capture test with explicit bitmap fallback | Passed | `mac-parity-captures.xcresult` |
+| Final capture fixture: connected items plus standard items at larger fonts | Passed | `mac-parity-captures-final.xcresult`, `mac-parity-captures-final/` |
+
+The hosted retry uses `-only-testing:CalendarShowcaseMacTests`. Focused capture runs
+use `-only-testing:CalendarShowcaseMacTests/AppKitScenarioTests/testMonthYearParityCaptures`.
+All Xcode runs disable parallel testing and set `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
+Across the hosted suite and final focused run, all 40 distinct hosted tests passed;
+the earlier failed runs remain failed records. Package coverage includes 20 core and
+28 AppKit tests. Existing animated reversal, resize cancellation, Reduce Motion,
+selection, keyboard, reuse, and performance tests passed. Added coverage checks years,
+custom-content precedence, empty-subtitle suppression, UTC year boundaries, activation
+and wake refresh, fractional geometry, image/event spacing, selected subtitles,
+font-fit stability after shrink/grow cycles, and quarter-step transition geometry.
+
+WindowServer `screencapture` returned `could not create image from window`, including
+with asynchronous capture. The capture test now retains explicitly named bitmap
+fallbacks and diagnostics while keeping its product geometry assertions. Eight final
+light/dark, selected/unselected, normal/large-font images were retained; representative
+images were inspected for full year text and centered groups. Bitmap capture is not a
+substitute for native layer composition verification. A live native app inspection via
+computer use separately confirmed centered continuous rows and February/March year
+labels. The UI runner failed before executing tests with `Timed out while enabling
+automation mode`; no successful automated UI run is claimed.
+
+The current Xcode XCTest libraries also emit deployment linker warnings for macOS 13
+because they target macOS 14. Runtime validation on macOS 13, exact Swift 6.2, manual
+VoiceOver, and a successful full UI run remain outstanding platform checks. UIKit was
+not changed or retested. No new source files were added; project regeneration was
+unnecessary.

@@ -13,7 +13,119 @@ import FSCalendarCore
     }
 }
 @MainActor private final class CustomItem: FSCalendarItem {}
+@MainActor private final class YearContentProvider: FSCalendarDataSource {
+    var content = DayContent()
+    func calendar(_ calendar: FSCalendarView, contentFor day: CivilDay) -> DayContent { content }
+}
 final class CalendarContentTests: XCTestCase {
+    @MainActor func testContinuousCenteringAndYearContentPrecedence() throws {
+        _ = NSApplication.shared
+        let calendar = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 400))
+        try calendar.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 0)!))
+        calendar.referenceDate = { Date(timeIntervalSince1970: 1767225600) } // 2026
+        calendar.today = try CivilDay(year: 2027, month: 1, day: 1)
+        let provider = YearContentProvider(); calendar.dataSource = provider
+        let item = FSCalendarItem()
+        item.view.frame.size = NSSize(width: 70.3, height: 44.5)
+        for mode: CalendarDisplayMode in [.continuousMonths, .week, .month(.horizontal)] {
+            try calendar.setDisplayMode(mode, animated: false)
+            for year in [2025, 2026, 2027] {
+                for month in [1, 6, 12] {
+                    for number in [1, 2] {
+                        let day = try CivilDay(year: year, month: month, day: number)
+                        let occurrence = try XCTUnwrap(calendar.engine.continuousMonthGrid(containing: day).occurrences.first { $0.day == day })
+                        for custom in [DayContent(), DayContent(title: "Launch"), DayContent(title: ""), DayContent(subtitle: "Note"), DayContent(subtitle: "")] {
+                            provider.content = custom
+                            item.prepareForReuse()
+                            calendar.configure(item, occurrence: occurrence); item.viewDidLayout()
+                            let automatic = mode.isContinuous && number == 1 && year != 2026 && custom.title == nil && custom.subtitle == nil
+                            XCTAssertEqual(item.subtitleLabel.stringValue, automatic ? String(year) : (custom.subtitle ?? ""))
+                            XCTAssertEqual(item.hasAutomaticYearSubtitle, automatic)
+                            let center = mode.isContinuous ? 44.5 / 2 : 44.5 * 5 / 12
+                            let group = item.subtitleLabel.stringValue.isEmpty ? item.titleLabel.frame : item.titleLabel.frame.union(item.subtitleLabel.frame)
+                            XCTAssertEqual(group.midY, center, accuracy: 0.001)
+                            XCTAssertEqual(item.selectionBackground.frame.midY, center, accuracy: 0.001)
+                            XCTAssertEqual(item.subtitleLabel.alphaValue, 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor func testContinuousYearFontFittingEventsAndReuse() throws {
+        _ = NSApplication.shared
+        let day = try CivilDay(year: 2027, month: 1, day: 1)
+        let occurrence = try XCTUnwrap(CalendarEngine(configuration: CalendarConfiguration()).continuousMonthGrid(containing: day).occurrences.first)
+        let item = FSCalendarItem()
+        var appearance = FSCalendarAppearance()
+        appearance.titleFont = .systemFont(ofSize: 40)
+        appearance.subtitleFont = .systemFont(ofSize: 30)
+        for selected in [false, true] {
+            for hasImage in [false, true] {
+                item.continuousCenteringProgress = 1; item.hasAutomaticYearSubtitle = true
+                item.apply(content: DayContent(title: "Jan", subtitle: "2027",
+                    image: hasImage ? NSImage(systemSymbolName: "heart", accessibilityDescription: nil) : nil, numberOfEvents: 3),
+                    state: DayState(occurrence: occurrence, isSelected: selected, isToday: true), appearance: appearance, style: DayAppearance())
+                var largeFont: NSFont?
+                for size in [NSSize(width: 110, height: 80), NSSize(width: 35.5, height: 44.5), NSSize(width: 110, height: 80)] {
+                    item.view.frame.size = size; item.viewDidLayout()
+                    XCTAssertEqual(item.titleLabel.frame.union(item.subtitleLabel.frame).midY, size.height / 2, accuracy: 0.001)
+                    for label in [item.titleLabel, item.subtitleLabel] {
+                        let font = try XCTUnwrap(label.font)
+                        XCTAssertLessThanOrEqual((label.stringValue as NSString).size(withAttributes: [.font: font]).width, label.frame.width)
+                    }
+                    if size.width == 110 {
+                        if let largeFont { XCTAssertEqual(item.titleLabel.font, largeFont) }
+                        largeFont = item.titleLabel.font
+                    }
+                    XCTAssertEqual(item.subtitleLabel.textColor, selected ? appearance.selectedTitleColor : appearance.subtitleColor)
+                    let dots = item.view.subviews.filter { $0 !== item.selectionBackground && !($0 is NSTextField) && !($0 is NSImageView) && !$0.isHidden }
+                    XCTAssertEqual(dots.count, 3)
+                    for dot in dots {
+                        XCTAssertGreaterThanOrEqual(dot.frame.minY, item.subtitleLabel.frame.maxY)
+                        XCTAssertLessThanOrEqual(dot.frame.maxY, size.height)
+                    }
+                }
+                item.prepareForReuse()
+                XCTAssertFalse(item.hasAutomaticYearSubtitle)
+                XCTAssertEqual(item.continuousCenteringProgress, 0)
+                XCTAssertEqual(item.subtitleLabel.alphaValue, 1)
+            }
+        }
+    }
+
+    @MainActor func testYearRolloverActivationWakeAndTimeZoneRefresh() throws {
+        _ = NSApplication.shared
+        let calendar = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 400))
+        try calendar.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 0)!))
+        var instant = Date(timeIntervalSince1970: 1798761599)
+        calendar.referenceDate = { instant }
+        try calendar.setDisplayMode(.continuousMonths, animated: false)
+        let window = NSWindow(contentRect: calendar.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = calendar; window.orderFront(nil)
+        defer { window.close() }
+        let january = try CivilDay(year: 2027, month: 1, day: 1)
+        try calendar.setCurrentPage(january); calendar.layoutSubtreeIfNeeded()
+        func item() throws -> FSCalendarItem {
+            try XCTUnwrap(calendar.collectionView.visibleItems().compactMap { $0 as? FSCalendarItem }.first { $0.dayState?.occurrence.day == january })
+        }
+        XCTAssertEqual(try item().subtitleLabel.stringValue, "2027")
+        let offset = calendar.scrollView.contentView.bounds.origin
+        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemClockDidChange, NSApplication.didBecomeActiveNotification] {
+            instant = Date(timeIntervalSince1970: 1798761601)
+            NotificationCenter.default.post(name: name, object: nil)
+            XCTAssertEqual(try item().subtitleLabel.stringValue, "")
+            instant = Date(timeIntervalSince1970: 1798761599)
+            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+            XCTAssertEqual(try item().subtitleLabel.stringValue, "2027")
+            XCTAssertEqual(calendar.scrollView.contentView.bounds.origin, offset)
+        }
+        try calendar.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 3600)!))
+        calendar.layoutSubtreeIfNeeded()
+        XCTAssertEqual(try item().subtitleLabel.stringValue, "")
+    }
+
     @MainActor func testLegacyCellContentAlignment() throws {
         _ = NSApplication.shared
         let day = try CivilDay(year: 2024, month: 2, day: 14)

@@ -139,6 +139,15 @@ extension FSCalendarView {
         }
         if notify { notifyHeight(animated: false) }
         needsPagePosition = true; needsLayout = true; layoutSubtreeIfNeeded()
+        if context.isContinuousScope {
+            for case let item as FSCalendarItem in collectionView.visibleItems() {
+                item.continuousCenteringProgress = context.monthProgress
+                item.view.layoutSubtreeIfNeeded()
+            }
+            for fade in context.titleFades {
+                fade.outgoing.frame.origin.y = fade.label.frame.midY - fade.outgoing.frame.height / 2
+            }
+        }
     }
     public func finishInteractiveTransition(commit: Bool, animated: Bool = true) {
         guard let context = transition else { return }

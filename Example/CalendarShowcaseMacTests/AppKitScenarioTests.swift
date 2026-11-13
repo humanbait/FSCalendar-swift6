@@ -6,6 +6,68 @@ import CalendarDemoSupportMac
 @testable import CalendarShowcaseMac
 
 final class AppKitScenarioTests: XCTestCase {
+    @MainActor func testMonthYearParityCaptures() async throws {
+        let controller = ShowcaseController(); _ = controller.view; controller.show(.connectedRange)
+        let window = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 1080, height: 820), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentViewController = controller
+        window.center(); window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        let calendar = controller.driver.calendar
+        calendar.referenceDate = { Date(timeIntervalSince1970: 1767225600) }
+        let january = try CivilDay(year: 2027, month: 1, day: 1)
+        for large in [false, true] {
+            if large {
+                calendar.dataSource = nil // Exercise the standard item with larger configured fonts.
+                var appearance = calendar.calendarAppearance
+                appearance.titleFont = .systemFont(ofSize: 32); appearance.subtitleFont = .systemFont(ofSize: 24)
+                appearance.rowHeight = 70
+                calendar.calendarAppearance = appearance
+            }
+            for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                window.appearance = NSAppearance(named: appearance)
+                for selected in [false, true] {
+                    try calendar.setSelection(selected ? [january] : [])
+                    try calendar.setCurrentPage(january)
+                    calendar.reloadData(); controller.view.layoutSubtreeIfNeeded()
+                    let item = try XCTUnwrap(calendar.collectionView.visibleItems().compactMap { $0 as? FSCalendarItem }.first { $0.dayState?.occurrence.day == january })
+                    item.viewDidLayout()
+                    XCTAssertEqual(item is ConnectedRangeAppKitItem, !large)
+                    XCTAssertEqual(item.titleLabel.stringValue, "Jan")
+                    XCTAssertEqual(item.subtitleLabel.stringValue, "2027")
+                    XCTAssertEqual(item.titleLabel.frame.union(item.subtitleLabel.frame).midY, item.view.bounds.midY, accuracy: 0.001)
+                    if let dot = item.view.layer?.sublayers?.first(where: { $0.name == "connectedRange.event" }) {
+                        XCTAssertFalse(dot.isHidden)
+                        XCTAssertGreaterThanOrEqual(dot.frame.minY, item.subtitleLabel.frame.maxY)
+                        XCTAssertLessThanOrEqual(dot.frame.maxY, item.view.bounds.height)
+                    }
+                    window.displayIfNeeded(); CATransaction.flush()
+                    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+                    let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                    process.arguments = ["-x", "-o", "-l", String(window.windowNumber), url.path]
+                    let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+                        process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+                        do { try process.run() } catch { continuation.resume(throwing: error) }
+                    }
+                    let image: NSImage
+                    let captureKind: String
+                    if status == 0, let native = NSImage(contentsOf: url) {
+                        image = native; captureKind = "native"
+                    } else {
+                        let bitmap = try XCTUnwrap(calendar.bitmapImageRepForCachingDisplay(in: calendar.bounds))
+                        calendar.cacheDisplay(in: calendar.bounds, to: bitmap)
+                        image = NSImage(size: calendar.bounds.size); image.addRepresentation(bitmap)
+                        captureKind = "bitmap-fallback"
+                        let diagnostic = XCTAttachment(string: "WindowServer capture unavailable (status \(status)); retained AppKit bitmap capture instead.")
+                        diagnostic.lifetime = .keepAlways; add(diagnostic)
+                    }
+                    let attachment = XCTAttachment(image: image)
+                    attachment.name = "mac-month-year-" + name + (selected ? "-selected" : "-plain") + (large ? "-large-" : "-connected-") + captureKind
+                    attachment.lifetime = .keepAlways; add(attachment)
+                }
+            }
+        }
+    }
+
     @MainActor func testConnectedScopeContainerFramesAndNativeCaptures() async throws {
         let controller = ShowcaseController(); _ = controller.view; controller.show(.connectedRange)
         let window = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 1080, height: 820),
@@ -245,8 +307,10 @@ final class AppKitScenarioTests: XCTestCase {
         for cell in [february, march] {
             let dot = try XCTUnwrap((cell.view.layer?.sublayers ?? []).first { $0.name == "connectedRange.event" })
             XCTAssertFalse(dot.isHidden)
-            XCTAssertEqual(cell.titleLabel.frame.midY, cell.view.bounds.midY, accuracy: 0.01)
-            XCTAssertEqual(dot.backgroundColor, NSColor.white.cgColor)
+            XCTAssertEqual(cell.titleLabel.frame.midY + cell.subtitleLabel.frame.height * cell.subtitleLabel.alphaValue / 2,
+                cell.view.bounds.midY, accuracy: 0.01)
+            let outside = cell.subtitleLabel.frame.height > 0 && dot.frame.maxY > cell.selectionBackground.frame.maxY
+            XCTAssertEqual(dot.backgroundColor, (outside ? driver.calendar.calendarAppearance.eventColor : NSColor.white).cgColor)
             XCTAssertTrue(((cell.view.accessibilityValue() as? String) ?? "").contains("Has events"))
             XCTAssertTrue((cell.view.accessibilityLabel() ?? "").contains("2024"))
         }
@@ -258,7 +322,8 @@ final class AppKitScenarioTests: XCTestCase {
             driver.view.layoutSubtreeIfNeeded()
             let cell = try XCTUnwrap(collection.visibleItems().compactMap { $0 as? FSCalendarItem }.first { $0.dayState?.occurrence.day == boundary[1] })
             XCTAssertEqual(cell.titleLabel.stringValue, mode.isContinuous ? "Mar" : "1")
-            XCTAssertEqual(cell.titleLabel.frame.midY, cell.view.bounds.midY, accuracy: 0.01)
+            XCTAssertEqual(cell.titleLabel.frame.midY + cell.subtitleLabel.frame.height * cell.subtitleLabel.alphaValue / 2,
+                cell.view.bounds.midY, accuracy: 0.01)
             let dot = try XCTUnwrap((cell.view.layer?.sublayers ?? []).first { $0.name == "connectedRange.event" })
             XCTAssertFalse(dot.isHidden)
         }

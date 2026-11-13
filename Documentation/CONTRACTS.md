@@ -35,14 +35,15 @@ A non-nil `DayContent.title`, including an empty string, takes precedence. Subti
 images, and full-date accessibility labels retain their usual behavior. Changing the
 configuration locale refreshes the month names.
 
-UIKit also shows a four-digit year below automatic month names outside the current
+UIKit and AppKit show a four-digit year below automatic month names outside the current
 Gregorian year in the configured time zone. The year uses subtitle styling and is
 omitted when a custom title or any non-nil subtitle (including an empty string) is
 supplied. The reference year comes from the clock, independently of the overridable
 `today` highlight; visible labels refresh on significant time changes and activation.
 The month/year group is centered, and its year fades with continuous/week transitions.
 Event dots below the selection fill retain the normal event color for visibility.
-AppKit does not add automatic year subtitles.
+AppKit also refreshes after wake and fits automatic month/year text to narrow columns
+from the original configured fonts, avoiding cumulative shrinking on resize.
 
 A one-physical-pixel separator follows each internal month boundary: below the previous
 month's cells, beside the first new-month cell, and above the remaining cells in the row.
