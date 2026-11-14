@@ -88,6 +88,10 @@ year underneath, using subtitle styling (selected-title color when selected). A 
 title or any non-nil subtitle, including an empty string, suppresses the automatic year.
 The reference year uses the actual clock in the configured time zone, independently
 of `today`, and refreshes on day/clock changes, activation, wake, and configuration updates.
+Clock and wake observers deliver on `OperationQueue.main` before entering the main actor,
+including notifications posted from background threads. Their weak captures do not retain
+the view; its isolated deinitializer removes the retained tokens from their original centers.
+See Apple's [notification delivery contract](https://developer.apple.com/documentation/foundation/notificationcenter/addobserver(forname:object:queue:using:)).
 The year fades and its occupied space follows continuous/week transition progress.
 Automatic month/year fonts fit narrow columns and larger configured fonts without
 cumulative shrinkage on resize. Events follow automatic years on the same line with
@@ -174,3 +178,31 @@ compared with runs on the same Mac, never with the iPhone baseline.
 Implementation references: Apple's [collection-view architecture](https://developer.apple.com/documentation/appkit/nscollectionview),
 [custom layout content size](https://developer.apple.com/documentation/appkit/nscollectionviewlayout/collectionviewcontentsize),
 and [Reduce Motion preference](https://developer.apple.com/documentation/appkit/nsworkspace/accessibilitydisplayshouldreducemotion).
+
+
+## Background clock delivery validation — 2026-11-14
+
+PowerTask's native background-notification checks exposed a Swift actor-isolation
+trap in the selector-based clock observer at revision
+`4860b0ae0de2faaec0ff5557f455c8cff3974a68`. The observer now delivers clock and wake
+callbacks on the main queue before touching AppKit, preserving the existing
+Today/year refresh and scroll position.
+
+With Xcode 27.2 (27B52), Swift 6.4.2, and macOS 27.2 on arm64,
+`swift test -Xswiftc -warnings-as-errors` passed all 49 host-compatible tests
+(20 Core and 29 AppKit). The rollover test posts day, clock, time-zone, activation,
+and workspace-wake notifications from a background queue, verifies Today/year
+labels and stable scroll position, and the lifetime test posts after disposal.
+PowerTask's 12 focused native checks also passed with this local dependency and
+Main Thread Checker configured to crash on a report. No checker reports occurred.
+
+Validation source blobs:
+
+- `FSCalendarView.swift`: `46197bfb01dbc14028c69b0b3bb29e2a4bf91b48`
+- `CalendarContentTests.swift`: `a90145fb5ce8667ef1127d296ffe7dd8a2bc177b`
+
+Local evidence: `/private/tmp/fscalendar-midnight-tests.log`,
+`/private/tmp/mac-midnight-tests-dependency.log`, and
+`/private/tmp/MacMidnightTestsDependency.xcresult`. Notifications were injected;
+no system-clock changes, overnight observation, simulator tests, or new physical
+iOS validation were performed for this AppKit-only correction.

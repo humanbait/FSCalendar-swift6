@@ -130,7 +130,7 @@ final class CalendarContentTests: XCTestCase {
         }
     }
 
-    @MainActor func testYearRolloverActivationWakeAndTimeZoneRefresh() throws {
+    @MainActor func testYearRolloverActivationWakeAndTimeZoneRefresh() async throws {
         _ = NSApplication.shared
         let calendar = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 400))
         try calendar.apply(configuration: CalendarConfiguration(timeZone: TimeZone(secondsFromGMT: 0)!))
@@ -147,12 +147,13 @@ final class CalendarContentTests: XCTestCase {
         }
         XCTAssertEqual(try item().subtitleLabel.stringValue, "2027")
         let offset = calendar.scrollView.contentView.bounds.origin
-        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemClockDidChange, NSApplication.didBecomeActiveNotification] {
+        for name in [Notification.Name.NSCalendarDayChanged, .NSSystemClockDidChange, .NSSystemTimeZoneDidChange, NSApplication.didBecomeActiveNotification] {
             instant = Date(timeIntervalSince1970: 1798761601)
-            NotificationCenter.default.post(name: name, object: nil)
+            await postFromBackground(name, center: .default)
             XCTAssertEqual(try item().subtitleLabel.stringValue, "")
+            XCTAssertEqual(calendar.today, january)
             instant = Date(timeIntervalSince1970: 1798761599)
-            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+            await postFromBackground(NSWorkspace.didWakeNotification, center: NSWorkspace.shared.notificationCenter)
             XCTAssertEqual(try item().subtitleLabel.stringValue, "2027")
             XCTAssertEqual(calendar.scrollView.contentView.bounds.origin, offset)
         }
@@ -285,7 +286,7 @@ final class CalendarContentTests: XCTestCase {
         XCTAssertFalse(disabled.isAccessibilityEnabled()); XCTAssertFalse(disabled.accessibilityPerformPress())
         XCTAssertTrue(view.selectedDays.isEmpty)
     }
-    @MainActor func testViewReleasesItsControllersAndItems() {
+    @MainActor func testViewReleasesItsControllersAndItems() async {
         _ = NSApplication.shared
         weak var reference: FSCalendarView?
         autoreleasepool {
@@ -293,6 +294,19 @@ final class CalendarContentTests: XCTestCase {
             view.layoutSubtreeIfNeeded(); reference = view
         }
         XCTAssertNil(reference)
+        await postFromBackground(.NSCalendarDayChanged, center: .default)
+        await postFromBackground(NSWorkspace.didWakeNotification, center: NSWorkspace.shared.notificationCenter)
+        XCTAssertNil(reference)
+    }
+
+    @MainActor private func postFromBackground(_ name: Notification.Name, center: NotificationCenter) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                XCTAssertFalse(Thread.isMainThread)
+                center.post(name: name, object: nil)
+                continuation.resume()
+            }
+        }
     }
 }
 #endif

@@ -51,6 +51,7 @@ import FSCalendarCore
     let scrollView = CalendarScrollView()
     let titleLabel = NSTextField(labelWithString: "")
     private var shortMonthSymbols: [String] = []
+    private var clockObservers: [(NotificationCenter, NSObjectProtocol)] = []
     let weekdayLabels = (0..<7).map { _ in NSTextField(labelWithString: "") }
     let controller = CalendarCollectionController()
     var needsPagePosition = true
@@ -84,16 +85,24 @@ import FSCalendarCore
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(accessibilityDisplayChanged), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
         for name in [Notification.Name.NSCalendarDayChanged, .NSSystemClockDidChange,
                      .NSSystemTimeZoneDidChange, NSApplication.didBecomeActiveNotification] {
-            NotificationCenter.default.addObserver(self, selector: #selector(clockDidChange), name: name, object: nil)
+            observeClockChange(name, center: .default)
         }
-        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(clockDidChange), name: NSWorkspace.didWakeNotification, object: nil)
+        observeClockChange(NSWorkspace.didWakeNotification, center: NSWorkspace.shared.notificationCenter)
         setAccessibilityIdentifier("calendar"); rebuild()
     }
-    deinit {
+    isolated deinit {
+        for (center, observer) in clockObservers { center.removeObserver(observer) }
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
-    @objc private func clockDidChange() {
+    private func observeClockChange(_ name: Notification.Name, center: NotificationCenter) {
+        // Foundation clock notifications may arrive on a background posting thread.
+        let observer = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.clockDidChange() }
+        }
+        clockObservers.append((center, observer))
+    }
+    private func clockDidChange() {
         cancelTransition()
         today = try? CivilDay(date: referenceDate(), timeZone: configuration.timeZone)
         for case let item as FSCalendarItem in collectionView.visibleItems() {
