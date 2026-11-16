@@ -73,8 +73,6 @@ import FSCalendarCore
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
         collectionView.setAccessibilityIdentifier("calendar-grid")
-        scrollView.hasHorizontalScroller = true; scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true; scrollView.scrollerStyle = .overlay
         scrollView.setAccessibilityIdentifier("calendar.scroll")
         scrollView.documentView = collectionView
         scrollView.drawsBackground = false; scrollView.borderType = .noBorder

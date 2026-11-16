@@ -491,3 +491,29 @@ the build/launch log is in `artifacts/mac-run/build.log`. The earlier package ru
 reset its date between modes; the final fixture explicitly restores February 14, 2024.
 UIKit was unchanged and not retested. macOS 13 runtime, exact Swift 6.2, and manual
 VoiceOver remain separate validation gaps.
+
+## Hidden AppKit scroll indicators — 2026-11-17
+
+The calendar hides both scroll indicators while retaining wheel/trackpad scrolling.
+`CalendarScrollView` keeps both scroller properties disabled because AppKit's
+collection view otherwise re-enables the vertical scroller when its clip view resizes.
+The showcase's surrounding scroll views keep their existing behavior.
+
+```sh
+./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64' --label appkit-hidden-scroll-indicators -- \
+  -only-testing:CalendarShowcaseMacTests/CalendarLayoutTests \
+  -only-testing:CalendarShowcaseMacUITests/MacUITests/testDragScrollingTransitionsAndWindowResize \
+  -only-testing:CalendarShowcaseMacUITests/MacUITests/testConnectedRangeBandsAndExtension
+```
+
+All 51 package tests, 10 hosted layout tests, and both UI tests passed on macOS 27.2
+arm64 with Xcode 27.2 and Swift 6.4.2. UI assertions verify no calendar scrollbars
+after horizontal paging and continuous vertical scrolling; selection, scope changes,
+and resizing also pass. Logs, screenshots, and results are retained in
+`artifacts/appkit-hidden-scroll-indicators-20261116T210050Z/`.
+The showcase built and launched with `./script/build_and_run.sh --verify`; live
+continuous-month scrolling showed no indicator and advanced the displayed month.
+The initial run in `artifacts/appkit-hidden-scroll-indicators-20261116T205603Z/`
+caught AppKit re-enabling the scrollbar and remains a failed record.
+UIKit was unchanged and not retested; minimum-platform and manual VoiceOver checks
+remain separate validation gaps.

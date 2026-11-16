@@ -94,6 +94,15 @@ import FSCalendarCore
 }
 
 @MainActor final class CalendarScrollView: NSScrollView {
+    // NSCollectionView enables scrollers when it resizes its enclosing clip view.
+    override var hasHorizontalScroller: Bool {
+        get { super.hasHorizontalScroller }
+        set { super.hasHorizontalScroller = false }
+    }
+    override var hasVerticalScroller: Bool {
+        get { super.hasVerticalScroller }
+        set { super.hasVerticalScroller = false }
+    }
     override var acceptsFirstResponder: Bool { false }
     weak var owner: FSCalendarView?
     override func scrollWheel(with event: NSEvent) {
