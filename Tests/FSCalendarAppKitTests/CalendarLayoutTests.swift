@@ -10,6 +10,53 @@ import FSCalendarCore
 }
 
 final class CalendarLayoutTests: XCTestCase {
+    @MainActor func testCompactWeekdaysFitAndAlignWithGridAcrossDisplayModes() throws {
+        _ = NSApplication.shared
+        let view = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 340))
+        try view.apply(configuration: CalendarConfiguration(placeholders: .sixRows,
+            timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX")))
+        let day = try CivilDay(year: 2024, month: 2, day: 14)
+        XCTAssertEqual(view.calendarAppearance.weekdayHeight, 18)
+        for (fontSize, weekdayHeight): (CGFloat, CGFloat) in [(12, 18), (20, 26)] {
+            var appearance = view.calendarAppearance
+            appearance.weekdayFont = .systemFont(ofSize: fontSize)
+            view.calendarAppearance = appearance
+            for mode: CalendarDisplayMode in [.month(.horizontal), .month(.vertical), .week, .continuousMonths] {
+                try view.setDisplayMode(mode, animated: false)
+                try view.setCurrentPage(day, animated: false)
+                view.frame.size.height = view.preferredHeight
+                view.layoutSubtreeIfNeeded()
+                let headerHeight: CGFloat = mode.isContinuous ? 0 : 44
+                let rows: CGFloat = mode.scope == .week ? 1 : (mode.isContinuous ? 5 : 6)
+                XCTAssertEqual(view.preferredHeight, headerHeight + weekdayHeight + rows * 44, accuracy: 0.001)
+                for (column, label) in view.weekdayLabels.enumerated() {
+                    XCTAssertEqual(label.frame.height, weekdayHeight, accuracy: 0.001)
+                    XCTAssertGreaterThanOrEqual(label.frame.height, label.fittingSize.height)
+                    XCTAssertEqual(label.frame.midX, (CGFloat(column) + 0.5) * 70, accuracy: 0.001)
+                    XCTAssertEqual(label.frame.minY, view.titleLabel.frame.maxY, accuracy: 0.001)
+                    XCTAssertEqual(label.frame.maxY, view.scrollView.frame.minY, accuracy: 0.001)
+                }
+            }
+        }
+    }
+
+    @MainActor func testWeekdayHeightFallbackMinimumAndCustomization() {
+        _ = NSApplication.shared
+        let view = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 490, height: 340))
+        for (requested, expected): (CGFloat, CGFloat) in [(.nan, 18), (.infinity, 18), (-.infinity, 18),
+                                                        (-100, 18), (0, 18), (40, 40)] {
+            var appearance = view.calendarAppearance
+            appearance.weekdayHeight = requested
+            view.calendarAppearance = appearance
+            view.layoutSubtreeIfNeeded()
+            XCTAssertTrue(view.preferredHeight.isFinite)
+            for label in view.weekdayLabels {
+                XCTAssertEqual(label.frame.height, expected, accuracy: 0.001)
+                XCTAssertEqual(label.frame.maxY, view.scrollView.frame.minY, accuracy: 0.001)
+            }
+        }
+    }
+
     @MainActor func testMonthSeparatorGeometryMirroringAndDecorationLifecycle() throws {
         _ = NSApplication.shared
         for weekday in 1...7 {

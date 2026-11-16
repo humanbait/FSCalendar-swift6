@@ -461,3 +461,33 @@ so its retained images are explicitly labeled bitmap fallbacks. Physical iOS dev
 macOS UI automation, minimum OS versions, and manual VoiceOver were not repeated.
 Existing transition and connected-range suites passed. No source files were added,
 so Xcode project regeneration was unnecessary.
+
+## AppKit weekday spacing — 2026-11-17
+
+AppKit's default weekday height and nonfinite-value fallback are now 18 points.
+The font-dependent minimum is the weekday font size plus 6 points, so the showcase's
+20-point weekday font uses a 26-point row. Custom heights remain supported.
+
+Validated on macOS 27.2 arm64 with Xcode 27.2 (27B52), Swift 6.4.2, and warnings
+treated as errors:
+
+```sh
+./Scripts/test-macos.sh --destination 'platform=macOS,arch=arm64' --label appkit-weekday-spacing -- \
+  -only-testing:CalendarShowcaseMacTests/CalendarLayoutTests \
+  -only-testing:CalendarShowcaseMacTests/CalendarTransitionTests \
+  -only-testing:CalendarShowcaseMacUITests/MacUITests/testAllScenarioScreensAndReset
+./script/build_and_run.sh --verify
+```
+
+All 51 package tests, 17 hosted layout/transition tests, and the UI test covering all
+19 showcase scenarios passed. New regression checks cover default/custom/invalid
+heights, larger fonts, preferred heights, and weekday/grid alignment in all four modes.
+Continuous-month and large-text screenshots were inspected with readable weekday
+labels and no clipping or overlap. The updated showcase also built and launched.
+
+Evidence is retained in `artifacts/appkit-weekday-spacing-20261116T204919Z/`;
+the build/launch log is in `artifacts/mac-run/build.log`. The earlier package run in
+`artifacts/appkit-weekday-spacing-20261116T204831Z/` failed because the new test did not
+reset its date between modes; the final fixture explicitly restores February 14, 2024.
+UIKit was unchanged and not retested. macOS 13 runtime, exact Swift 6.2, and manual
+VoiceOver remain separate validation gaps.

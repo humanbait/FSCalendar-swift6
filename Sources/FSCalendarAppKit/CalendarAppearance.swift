@@ -32,7 +32,7 @@ public typealias DayState = FSCalendarCore.DayState
     public var weekdayFont: NSFont = .systemFont(ofSize: 12)
     public var rowHeight: CGFloat = 44
     public var headerHeight: CGFloat = 44
-    public var weekdayHeight: CGFloat = 26
+    public var weekdayHeight: CGFloat = 18
     public init() {}
 
     func resolved() -> Self {
@@ -43,7 +43,7 @@ public typealias DayState = FSCalendarCore.DayState
         copy.monthSeparatorCornerRadius = dimension(monthSeparatorCornerRadius, fallback: 8)
         copy.rowHeight = max(dimension(rowHeight, fallback: 44), titleFont.pointSize + subtitleFont.pointSize + 16)
         copy.headerHeight = max(dimension(headerHeight, fallback: 44), headerFont.pointSize + 16)
-        copy.weekdayHeight = max(dimension(weekdayHeight, fallback: 26), weekdayFont.pointSize + 10)
+        copy.weekdayHeight = max(dimension(weekdayHeight, fallback: 18), weekdayFont.pointSize + 6)
         return copy
     }
 }
