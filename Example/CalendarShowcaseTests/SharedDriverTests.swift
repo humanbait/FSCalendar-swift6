@@ -10,13 +10,18 @@ final class SharedDriverTests: XCTestCase {
         let day = try CivilDay(year: 2027, month: 1, day: 1)
         let occurrence = try XCTUnwrap(CalendarEngine(configuration: CalendarConfiguration()).continuousMonthGrid(containing: day).occurrences.first)
         let cell = ConnectedRangeSwiftCell(frame: .zero)
-        for height: CGFloat in [44, 59.5, 80] {
+        for height: CGFloat in [36, 44, 59.5, 80] {
+            var appearance = FSCalendarAppearance()
+            if height == 36 {
+                appearance.rowHeight = 36
+                appearance.selectionVerticalInset = 0
+            }
             cell.frame = CGRect(x: 0, y: 0, width: 56, height: height)
             for selected in [false, true] {
                 for events in [0, 1] {
                     cell.apply(content: DayContent(title: "Jan", subtitle: "2027", numberOfEvents: events),
                         state: DayState(occurrence: occurrence, isSelected: selected, isToday: true),
-                        appearance: FSCalendarAppearance(), style: DayAppearance())
+                        appearance: appearance, style: DayAppearance())
                     cell.layoutIfNeeded()
                     XCTAssertEqual(cell.titleLabel.frame.union(cell.subtitleLabel.frame).midY, height / 2, accuracy: 0.001)
                     XCTAssertEqual(cell.selectionBackground.frame.midY, height / 2, accuracy: 0.001)
@@ -202,6 +207,20 @@ final class SharedDriverTests: XCTestCase {
                 }
             }
         }
+        var compactAppearance = appearance
+        compactAppearance.rowHeight = 36
+        compactAppearance.selectionVerticalInset = 0
+        cell.semanticContentAttribute = .forceLeftToRight
+        cell.frame = CGRect(x: 0, y: 0, width: 56, height: 36)
+        cell.apply(content: DayContent(title: "14", numberOfEvents: 1),
+                   state: DayState(occurrence: occurrence, isSelected: true, isToday: true),
+                   appearance: compactAppearance, style: DayAppearance())
+        cell.setNeedsLayout(); cell.layoutIfNeeded()
+        let compactDot = try XCTUnwrap((cell.contentView.layer.sublayers ?? []).first { $0.name == "connectedRange.event" })
+        XCTAssertEqual(cell.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(cell.selectionBackground.frame.height, 36, accuracy: 0.001)
+        XCTAssertLessThanOrEqual(compactDot.frame.maxY, 36)
+        XCTAssertEqual(compactDot.backgroundColor, compactAppearance.selectedTitleColor.resolvedColor(with: cell.traitCollection).cgColor)
         cell.apply(content: DayContent(numberOfEvents: 1, accessibilityValue: "Meeting"),
             state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
             appearance: appearance, style: DayAppearance(eventColor: .green))
@@ -225,8 +244,38 @@ final class SharedDriverTests: XCTestCase {
         XCTAssertFalse((cell.accessibilityValue ?? "").contains("Has events"))
     }
 
+    @MainActor func testContinuousMonthsCompactZeroRowSpacing() throws {
+        let driver = SwiftCalendarDriver(scenario: .continuous)
+        XCTAssertEqual(driver.calendar.appearance.rowHeight, 36)
+        XCTAssertEqual(driver.calendar.appearance.selectionVerticalInset, 0)
+        let window = host(driver); defer { window.isHidden = true }
+        let todayDay = try CivilDay(year: 2024, month: 2, day: 14)
+        let selectedDay = try CivilDay(year: 2024, month: 2, day: 21)
+        try driver.calendar.setSelection([selectedDay])
+        driver.calendar.reloadData(); driver.view.layoutIfNeeded()
+        func cells(in view: UIView) -> [FSCalendarCell] {
+            if let collection = view as? UICollectionView {
+                return collection.visibleCells.compactMap { $0 as? FSCalendarCell }
+            }
+            return view.subviews.flatMap(cells)
+        }
+        let visible = cells(in: driver.view)
+        let today = try XCTUnwrap(visible.first { $0.dayState?.occurrence.day == todayDay })
+        let selected = try XCTUnwrap(visible.first { $0.dayState?.occurrence.day == selectedDay })
+        XCTAssertEqual(today.frame.height, driver.calendar.effectiveRowHeight, accuracy: 0.5)
+        XCTAssertEqual(selected.frame.minY, today.frame.maxY, accuracy: 0.5)
+        XCTAssertEqual(today.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(today.selectionBackground.frame.height, today.contentView.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(selected.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(selected.selectionBackground.frame.height, selected.contentView.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(today.frame.minY + today.selectionBackground.frame.maxY,
+                       selected.frame.minY + selected.selectionBackground.frame.minY, accuracy: 0.5)
+    }
+
     @MainActor func testConnectedRangeBandGeometryAndReuse() throws {
         let driver = SwiftCalendarDriver(scenario: .connectedRange)
+        XCTAssertEqual(driver.calendar.appearance.rowHeight, 36)
+        XCTAssertEqual(driver.calendar.appearance.selectionVerticalInset, 0)
         let window = host(driver); defer { window.isHidden = true }
         let days = try (16...20).map { try CivilDay(date: DemoFixtures.date("2024-02-\($0)"), timeZone: DemoFixtures.calendar.timeZone) }
         try driver.calendar.setSelection(days)
@@ -245,6 +294,14 @@ final class SharedDriverTests: XCTestCase {
         }
         let friday = try band(16), saturday = try band(17), sunday = try band(18)
         let monday = try band(19), tuesday = try band(20)
+        XCTAssertEqual(friday.frame.height, driver.calendar.effectiveRowHeight, accuracy: 0.5)
+        XCTAssertEqual(sunday.frame.minY, friday.frame.maxY, accuracy: 0.5)
+        XCTAssertEqual(friday.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(friday.selectionBackground.frame.height, friday.contentView.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(sunday.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(sunday.selectionBackground.frame.height, sunday.contentView.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(friday.frame.minY + friday.selectionBackground.frame.maxY,
+                       sunday.frame.minY + sunday.selectionBackground.frame.minY, accuracy: 0.5)
         let left: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
         let right: CACornerMask = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
         XCTAssertEqual(friday.selectionBackground.layer.maskedCorners, left)

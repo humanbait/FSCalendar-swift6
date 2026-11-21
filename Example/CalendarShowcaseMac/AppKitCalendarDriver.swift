@@ -43,6 +43,12 @@ import FSCalendarCore
         calendar.setAccessibilityIdentifier("calendar")
         calendar.swipeSelectionEnabled = [.swipe, .range].contains(scenario)
         if [.custom, .range].contains(scenario) { try! calendar.register(DemoAppKitItem.self, forItemReuseIdentifier: "custom") }
+        if [.continuous, .connectedRange].contains(scenario) {
+            var appearance = calendar.calendarAppearance
+            appearance.rowHeight = 36
+            appearance.selectionVerticalInset = 0
+            calendar.calendarAppearance = appearance
+        }
         if scenario == .connectedRange {
             try! calendar.register(ConnectedRangeAppKitItem.self, forItemReuseIdentifier: "connected")
         }
@@ -229,7 +235,7 @@ import FSCalendarCore
         if role == .middle || role == .leading { frame.size.width += overlap }
         selectionBackground.frame = frame
         selectionBackground.layer?.borderWidth = 0
-        selectionBackground.layer?.cornerRadius = selectionBackground.bounds.height / 2
+        selectionBackground.layer?.cornerRadius = role == .middle ? 0 : selectionBackground.bounds.height / 2
         selectionBackground.layer?.maskedCorners = switch role {
         case .single: allCorners
         case .leading: [.layerMinXMinYCorner, .layerMinXMaxYCorner]

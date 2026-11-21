@@ -237,6 +237,20 @@ final class AppKitScenarioTests: XCTestCase {
                 }
             }
         }
+        var compactAppearance = appearance
+        compactAppearance.rowHeight = 36
+        compactAppearance.selectionVerticalInset = 0
+        cell.view.userInterfaceLayoutDirection = .leftToRight
+        cell.view.frame = NSRect(x: 0, y: 0, width: 56, height: 36)
+        cell.apply(content: DayContent(title: "14", numberOfEvents: 1),
+                   state: DayState(occurrence: occurrence, isSelected: true, isToday: true),
+                   appearance: compactAppearance, style: DayAppearance())
+        cell.viewDidLayout()
+        let compactDot = try XCTUnwrap((cell.view.layer?.sublayers ?? []).first { $0.name == "connectedRange.event" })
+        XCTAssertEqual(cell.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(cell.selectionBackground.frame.height, 36, accuracy: 0.001)
+        XCTAssertLessThanOrEqual(compactDot.frame.maxY, 36)
+        XCTAssertEqual(compactDot.backgroundColor, compactAppearance.selectedTitleColor.cgColor)
         cell.apply(content: DayContent(numberOfEvents: 1, accessibilityValue: "Meeting"),
             state: DayState(occurrence: occurrence, isSelected: false, isToday: false),
             appearance: appearance, style: DayAppearance(eventColor: .green))
@@ -262,8 +276,42 @@ final class AppKitScenarioTests: XCTestCase {
         XCTAssertFalse(((cell.view.accessibilityValue() as? String) ?? "").contains("Has events"))
     }
 
+    @MainActor func testContinuousMonthsCompactZeroRowSpacing() throws {
+        let driver = AppKitCalendarDriver(scenario: .continuous)
+        XCTAssertEqual(driver.calendar.calendarAppearance.rowHeight, 36)
+        XCTAssertEqual(driver.calendar.calendarAppearance.selectionVerticalInset, 0)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 630, height: 420), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = driver.view; window.orderFront(nil)
+        defer { window.close() }
+        let todayDay = try CivilDay(year: 2024, month: 2, day: 14)
+        let selectedDay = try CivilDay(year: 2024, month: 2, day: 21)
+        try driver.calendar.setSelection([selectedDay])
+        driver.calendar.reloadData(); driver.view.layoutSubtreeIfNeeded()
+        let collection = try XCTUnwrap(driver.view.subviews.compactMap { $0 as? NSScrollView }.first?.documentView as? NSCollectionView)
+        let items = collection.visibleItems().compactMap { $0 as? FSCalendarItem }
+        let today = try XCTUnwrap(items.first { $0.dayState?.occurrence.day == todayDay })
+        let selected = try XCTUnwrap(items.first { $0.dayState?.occurrence.day == selectedDay })
+        XCTAssertEqual(today.view.frame.height, 36, accuracy: 0.5)
+        XCTAssertEqual(selected.view.frame.height, 36, accuracy: 0.5)
+        XCTAssertEqual(selected.view.frame.minY, today.view.frame.maxY, accuracy: 0.5)
+        XCTAssertEqual(today.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(today.selectionBackground.frame.height, today.view.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(selected.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(selected.selectionBackground.frame.height, selected.view.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(today.view.frame.minY + today.selectionBackground.frame.maxY,
+                       selected.view.frame.minY + selected.selectionBackground.frame.minY, accuracy: 0.5)
+        let bitmap = try XCTUnwrap(driver.view.bitmapImageRepForCachingDisplay(in: driver.view.bounds))
+        driver.view.cacheDisplay(in: driver.view.bounds, to: bitmap)
+        let image = NSImage(size: driver.view.bounds.size); image.addRepresentation(bitmap)
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "appkit-continuous-compact-zero-spacing"; attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     @MainActor func testConnectedRangeBandGeometryAndReuse() throws {
         let driver = AppKitCalendarDriver(scenario: .connectedRange)
+        XCTAssertEqual(driver.calendar.calendarAppearance.rowHeight, 36)
+        XCTAssertEqual(driver.calendar.calendarAppearance.selectionVerticalInset, 0)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 630, height: 650), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.contentView = driver.view; window.orderFront(nil)
         defer { window.close() }
@@ -279,6 +327,14 @@ final class AppKitScenarioTests: XCTestCase {
         }
         let friday = try band(16), saturday = try band(17), sunday = try band(18)
         let monday = try band(19), tuesday = try band(20)
+        XCTAssertEqual(friday.view.frame.height, 36, accuracy: 0.5)
+        XCTAssertEqual(sunday.view.frame.minY, friday.view.frame.maxY, accuracy: 0.5)
+        XCTAssertEqual(friday.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(friday.selectionBackground.frame.height, friday.view.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(sunday.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(sunday.selectionBackground.frame.height, sunday.view.bounds.height, accuracy: 0.001)
+        XCTAssertEqual(friday.view.frame.minY + friday.selectionBackground.frame.maxY,
+                       sunday.view.frame.minY + sunday.selectionBackground.frame.minY, accuracy: 0.5)
         let left: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
         let right: CACornerMask = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
         XCTAssertEqual(friday.selectionBackground.layer?.maskedCorners, left)

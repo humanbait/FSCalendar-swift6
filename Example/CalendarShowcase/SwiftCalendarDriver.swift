@@ -42,6 +42,12 @@ import FSCalendarCore
         calendar.scopeGestureEnabled = ![.scope, .connectedRange].contains(scenario)
         calendar.swipeSelectionEnabled = [.swipe, .range].contains(scenario)
         if [.custom, .range].contains(scenario) { try! calendar.register(DemoSwiftCell.self, forCellReuseIdentifier: "custom") }
+        if [.continuous, .connectedRange].contains(scenario) {
+            var appearance = calendar.appearance
+            appearance.rowHeight = 36
+            appearance.selectionVerticalInset = 0
+            calendar.appearance = appearance
+        }
         if scenario == .connectedRange {
             try! calendar.register(ConnectedRangeSwiftCell.self, forCellReuseIdentifier: "connected")
             var appearance = calendar.appearance
@@ -240,7 +246,7 @@ import FSCalendarCore
         if role == .middle || role == .leading { frame.size.width += overlap }
         selectionBackground.frame = frame
         selectionBackground.layer.borderWidth = 0
-        selectionBackground.layer.cornerRadius = selectionBackground.bounds.height / 2
+        selectionBackground.layer.cornerRadius = role == .middle ? 0 : selectionBackground.bounds.height / 2
         selectionBackground.layer.maskedCorners = switch role {
         case .single: allCorners
         case .leading: [.layerMinXMinYCorner, .layerMinXMaxYCorner]
