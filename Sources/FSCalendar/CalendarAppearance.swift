@@ -31,6 +31,8 @@ public typealias DayState = FSCalendarCore.DayState
     public var headerFont: UIFont = .preferredFont(forTextStyle: .headline)
     public var weekdayFont: UIFont = .preferredFont(forTextStyle: .caption1)
     public var rowHeight: CGFloat = 44
+    /// Vertical inset for the selection circle inside each row. Nil retains the legacy 5/6 circle sizing; zero fills the row height.
+    public var selectionVerticalInset: CGFloat? = nil
     public var headerHeight: CGFloat = 44
     public var weekdayHeight: CGFloat = 18
     public init() {}
@@ -49,6 +51,7 @@ public typealias DayState = FSCalendarCore.DayState
         copy.headerFont = font(headerFont); copy.weekdayFont = font(weekdayFont)
         copy.monthSeparatorCornerRadius = dimension(monthSeparatorCornerRadius, fallback: 8)
         copy.rowHeight = dimension(rowHeight, fallback: 44)
+        copy.selectionVerticalInset = selectionVerticalInset.map { dimension($0, fallback: 0) }
         copy.headerHeight = dimension(headerHeight, fallback: 44)
         copy.weekdayHeight = dimension(weekdayHeight, fallback: 18)
         return copy

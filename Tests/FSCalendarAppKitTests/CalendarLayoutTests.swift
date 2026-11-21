@@ -57,6 +57,74 @@ final class CalendarLayoutTests: XCTestCase {
         }
     }
 
+    @MainActor func testCompactRowHeightAndZeroSelectionVerticalInset() throws {
+        _ = NSApplication.shared
+        let view = FSCalendarView(frame: NSRect(x: 0, y: 0, width: 350, height: 320))
+        try view.apply(configuration: CalendarConfiguration(
+            timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US_POSIX")))
+        let day = try CivilDay(year: 2027, month: 1, day: 1)
+        for (requested, expected): (CGFloat, CGFloat) in [(.nan, 44), (.infinity, 44), (-100, 34), (0, 34), (36, 36), (44, 44)] {
+            var appearance = FSCalendarAppearance()
+            appearance.rowHeight = requested
+            view.calendarAppearance = appearance
+            XCTAssertEqual(view.metrics.rowHeight, expected, accuracy: 0.001)
+        }
+        var large = FSCalendarAppearance()
+        large.titleFont = .systemFont(ofSize: 20)
+        large.subtitleFont = .systemFont(ofSize: 13)
+        large.rowHeight = 30
+        view.calendarAppearance = large
+        XCTAssertEqual(view.metrics.rowHeight, 42, accuracy: 0.001)
+
+        var compact = FSCalendarAppearance()
+        compact.rowHeight = 36
+        compact.selectionVerticalInset = 0
+        view.calendarAppearance = compact
+        let provider = MonthLabelProvider()
+        provider.content = DayContent(numberOfEvents: 1)
+        view.dataSource = provider
+        try view.select(day)
+        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = view; window.orderFront(nil)
+        defer { window.close() }
+        for mode: CalendarDisplayMode in [.continuousMonths, .week] {
+            try view.setDisplayMode(mode, animated: false)
+            try view.setCurrentPage(day, animated: false)
+            view.frame.size.height = mode.isContinuous ? 320 : view.preferredHeight
+            view.layoutSubtreeIfNeeded()
+            let item = try XCTUnwrap(view.collectionView.visibleItems().compactMap { $0 as? FSCalendarItem }
+                .first { $0.dayState?.occurrence.day == day })
+            XCTAssertEqual(item.view.bounds.height, 36, accuracy: 0.5)
+            XCTAssertEqual(item.selectionBackground.frame.minY, 0, accuracy: 0.001)
+            XCTAssertEqual(item.selectionBackground.frame.height, 36, accuracy: 0.5)
+            XCTAssertEqual(item.selectionBackground.frame.midY, item.view.bounds.midY, accuracy: 0.001)
+            XCTAssertTrue(item.view.bounds.contains(item.titleLabel.frame))
+            if mode.isContinuous {
+                XCTAssertEqual(item.subtitleLabel.stringValue, "2027")
+                XCTAssertTrue(item.view.bounds.contains(item.subtitleLabel.frame))
+            }
+            let dots = item.view.subviews.filter { $0 !== item.selectionBackground && !($0 is NSTextField) && !($0 is NSImageView) && !$0.isHidden }
+            XCTAssertEqual(dots.count, 1)
+            XCTAssertTrue(item.view.bounds.contains(dots[0].frame))
+        }
+
+        let item = FSCalendarItem()
+        item.view.frame = NSRect(x: 0, y: 0, width: 50, height: 44)
+        let engine = try CalendarEngine(configuration: CalendarConfiguration())
+        let occurrence = try XCTUnwrap(engine.grid(containing: day, scope: .month).occurrences.first { $0.day == day })
+        var inset = FSCalendarAppearance()
+        inset.selectionVerticalInset = 0
+        item.apply(content: DayContent(), state: DayState(occurrence: occurrence, isSelected: true, isToday: false),
+                   appearance: inset.resolved(), style: DayAppearance())
+        item.viewDidLayout()
+        XCTAssertEqual(item.selectionBackground.frame.height, 44, accuracy: 0.001)
+        item.prepareForReuse()
+        item.apply(content: DayContent(), state: DayState(occurrence: occurrence, isSelected: true, isToday: false),
+                   appearance: FSCalendarAppearance().resolved(), style: DayAppearance())
+        item.viewDidLayout()
+        XCTAssertEqual(item.selectionBackground.frame.height, 35, accuracy: 0.5)
+    }
+
     @MainActor func testMonthSeparatorGeometryMirroringAndDecorationLifecycle() throws {
         _ = NSApplication.shared
         for weekday in 1...7 {

@@ -13,6 +13,7 @@ import FSCalendarCore
     public private(set) var dayState: DayState?
     private let dots = (0..<3).map { _ in NSView() }
     private var radius: CGFloat?
+    private var selectionVerticalInset: CGFloat?
     var continuousCenteringProgress: CGFloat = 0 {
         didSet { if oldValue != continuousCenteringProgress { view.needsLayout = true } }
     }
@@ -36,6 +37,7 @@ import FSCalendarCore
     open func apply(content: DayContent, state: DayState, appearance: FSCalendarAppearance, style: DayAppearance) {
         _ = view
         dayState = state; isSelected = state.isSelected; radius = style.cornerRadius
+        selectionVerticalInset = appearance.selectionVerticalInset.map { $0.isFinite ? max(0, $0) : 0 }
         view.isHidden = state.occurrence.isHidden
         titleLabel.stringValue = content.title ?? String(state.occurrence.day.day)
         subtitleLabel.stringValue = content.subtitle ?? ""
@@ -93,12 +95,18 @@ import FSCalendarCore
         let titleHeight = naturalTitleHeight + (min(naturalTitleHeight, titleLimit) - naturalTitleHeight) * continuousCenteringProgress
         let subtitleHeight = naturalSubtitleHeight + (min(naturalSubtitleHeight, size.height * 0.25) - naturalSubtitleHeight) * continuousCenteringProgress
         let occupiedSubtitleHeight = subtitleHeight * subtitleProgress
-        // Keep the legacy circle size while centering continuous content.
-        let contentHeight = size.height * 5 / 6
-        let offset = size.height / 12 * continuousCenteringProgress
-        let standardDiameter: CGFloat = 100 / 3
-        let availableDiameter = max(0, min(size.width, contentHeight))
-        let diameter = availableDiameter - max(0, availableDiameter - standardDiameter) / 2
+        // Keep the legacy circle size unless an explicit vertical inset is configured.
+        let contentHeight = selectionVerticalInset == nil ? size.height * 5 / 6 : size.height
+        let offset = selectionVerticalInset == nil ? size.height / 12 * continuousCenteringProgress : 0
+        let diameter: CGFloat
+        if let inset = selectionVerticalInset {
+            let clampedInset = min(size.height / 2, max(0, inset))
+            diameter = max(0, min(size.width, size.height - clampedInset * 2))
+        } else {
+            let standardDiameter: CGFloat = 100 / 3
+            let availableDiameter = max(0, min(size.width, contentHeight))
+            diameter = availableDiameter - max(0, availableDiameter - standardDiameter) / 2
+        }
         selectionBackground.frame = NSRect(x: (size.width - diameter) / 2, y: (contentHeight - diameter) / 2 + offset, width: diameter, height: diameter)
         selectionBackground.layer?.cornerRadius = radius ?? max(0, diameter / 2)
         let top = (contentHeight - titleHeight - occupiedSubtitleHeight) / 2 + offset
@@ -110,7 +118,9 @@ import FSCalendarCore
         let dotHeight = min(4, eventSize * 0.83)
         let legacyDotY = (contentHeight + diameter) / 2 + eventSize * 0.17 + (eventSize * 0.83 - dotHeight) / 2
         let centeredDotY = min(max(0, size.height - dotHeight), (size.height + titleHeight + occupiedSubtitleHeight) / 2 + 2)
-        let dotY = legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
+        let dotY = selectionVerticalInset == nil
+            ? legacyDotY + (centeredDotY - legacyDotY) * continuousCenteringProgress
+            : centeredDotY
         var inlineX = size.width / 2 - dotWidth / 2
         if hasAutomaticYearSubtitle, count > 0 {
             let yearWidth = min(subtitleLabel.intrinsicContentSize.width, max(0, size.width - 4 - inlineSpace))
@@ -130,7 +140,7 @@ import FSCalendarCore
             }
             dot.layer?.cornerRadius = dotHeight / 2
             let shape = NSBezierPath(roundedRect: selectionBackground.frame, xRadius: radius ?? diameter / 2, yRadius: radius ?? diameter / 2)
-            let insideSelection = continuousCenteringProgress > 0 &&
+            let insideSelection = (continuousCenteringProgress > 0 || selectionVerticalInset != nil) &&
                 [CGPoint(x: dot.frame.minX, y: dot.frame.minY), CGPoint(x: dot.frame.maxX, y: dot.frame.minY),
                  CGPoint(x: dot.frame.minX, y: dot.frame.maxY), CGPoint(x: dot.frame.maxX, y: dot.frame.maxY)].allSatisfy(shape.contains)
             dot.layer?.backgroundColor = (isSelected && insideSelection ? selectedEventColor : normalEventColor).cgColor
@@ -138,7 +148,7 @@ import FSCalendarCore
     }
     open override func prepareForReuse() {
         super.prepareForReuse(); dayState = nil; isSelected = false
-        continuousCenteringProgress = 0; hasAutomaticYearSubtitle = false
+        continuousCenteringProgress = 0; selectionVerticalInset = nil; hasAutomaticYearSubtitle = false
         originalTitleFont = nil; originalSubtitleFont = nil; subtitleLabel.alphaValue = 1
         (view as? CalendarDayView)?.owner = nil; (view as? CalendarDayView)?.day = nil
         view.layer?.borderWidth = 0

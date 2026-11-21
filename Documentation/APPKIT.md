@@ -83,7 +83,10 @@ native NSScrollView scrolling and shared boundary weeks with no repeated dates. 
 labels remain visible; the month/year heading is hidden without reserving its height.
 First days use localized short month names, and rounded stepped lines separate months.
 Continuous rows center the text group and selection/today circle without enlarging the
-circle. Automatic month labels outside the current Gregorian year show a four-digit
+circle when `selectionVerticalInset` is `nil`. Setting `selectionVerticalInset` (for example `0`)
+centers text and sizes the selection circle to `min(cellWidth, cellHeight - 2 * inset)` in both
+week and continuous-month modes, and `rowHeight` honors compact heights down to
+`titleFont.pointSize + subtitleFont.pointSize + 9` (34 points with default fonts). Automatic month labels outside the current Gregorian year show a four-digit
 year underneath, using subtitle styling (selected-title color when selected). A custom
 title or any non-nil subtitle, including an empty string, suppresses the automatic year.
 The reference year uses the actual clock in the configured time zone, independently

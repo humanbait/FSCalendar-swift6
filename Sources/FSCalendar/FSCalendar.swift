@@ -232,7 +232,7 @@ import FSCalendarCore
         }
     }
     var effectiveRowHeight: CGFloat {
-        max(UIFontMetrics(forTextStyle: .body).scaledValue(for: max(24, resolvedAppearance.rowHeight), compatibleWith: traitCollection), resolvedAppearance.titleFont.lineHeight + resolvedAppearance.subtitleFont.lineHeight + 12)
+        max(UIFontMetrics(forTextStyle: .body).scaledValue(for: max(24, resolvedAppearance.rowHeight), compatibleWith: traitCollection), resolvedAppearance.titleFont.lineHeight + resolvedAppearance.subtitleFont.lineHeight + 2)
     }
     var effectiveHeaderHeight: CGFloat { max(resolvedAppearance.headerHeight, resolvedAppearance.headerFont.lineHeight + 12) }
     var effectiveWeekdayHeight: CGFloat { max(resolvedAppearance.weekdayHeight, resolvedAppearance.weekdayFont.lineHeight + 4) }

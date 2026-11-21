@@ -1333,10 +1333,46 @@ final class CalendarViewTests: XCTestCase {
         let view = try make()
         var appearance = view.appearance
         appearance.rowHeight = .nan; appearance.headerHeight = .infinity; appearance.weekdayHeight = -100
+        appearance.selectionVerticalInset = .nan
         view.appearance = appearance; view.layoutIfNeeded()
         XCTAssertTrue(view.preferredHeight.isFinite)
         XCTAssertGreaterThan(view.preferredHeight, 0)
         XCTAssertTrue(view.collectionView.contentSize.width.isFinite)
+    }
+    @MainActor func testCompactRowHeightAndZeroSelectionVerticalInset() throws {
+        let view = try make()
+        var compact = view.appearance
+        compact.rowHeight = 36
+        compact.selectionVerticalInset = 0
+        view.appearance = compact
+        let floor = view.resolvedAppearance.titleFont.lineHeight + view.resolvedAppearance.subtitleFont.lineHeight + 2
+        XCTAssertEqual(view.effectiveRowHeight, max(UIFontMetrics(forTextStyle: .body).scaledValue(for: 36, compatibleWith: view.traitCollection), floor), accuracy: 0.001)
+
+        var minimum = compact
+        minimum.rowHeight = 0
+        view.appearance = minimum
+        XCTAssertEqual(view.effectiveRowHeight, max(UIFontMetrics(forTextStyle: .body).scaledValue(for: 24, compatibleWith: view.traitCollection), floor), accuracy: 0.001)
+
+        let day = try CivilDay(year: 2027, month: 1, day: 1)
+        let engine = try CalendarEngine(configuration: CalendarConfiguration())
+        let occurrence = try XCTUnwrap(engine.grid(containing: day, scope: .month).occurrences.first { $0.day == day })
+        let cell = FSCalendarCell(frame: CGRect(x: 0, y: 0, width: 54, height: 36))
+        cell.apply(content: DayContent(title: "Jan", subtitle: "2027", numberOfEvents: 1),
+                   state: DayState(occurrence: occurrence, isSelected: true, isToday: false),
+                   appearance: compact.resolved(for: cell.traitCollection), style: DayAppearance())
+        cell.layoutIfNeeded()
+        XCTAssertEqual(cell.selectionBackground.frame.minY, 0, accuracy: 0.001)
+        XCTAssertEqual(cell.selectionBackground.frame.height, 36, accuracy: 0.001)
+        XCTAssertTrue(cell.contentView.bounds.contains(cell.titleLabel.frame))
+        XCTAssertTrue(cell.contentView.bounds.contains(cell.subtitleLabel.frame))
+        let stack = try XCTUnwrap(cell.contentView.subviews.compactMap { $0 as? UIStackView }.first)
+        XCTAssertTrue(cell.contentView.bounds.contains(stack.frame))
+        cell.prepareForReuse()
+        cell.frame = CGRect(x: 0, y: 0, width: 116, height: 44)
+        cell.apply(content: DayContent(), state: DayState(occurrence: occurrence, isSelected: true, isToday: false),
+                   appearance: FSCalendarAppearance().resolved(for: cell.traitCollection), style: DayAppearance())
+        cell.layoutIfNeeded()
+        XCTAssertEqual(cell.selectionBackground.frame.height, 35, accuracy: 0.5)
     }
     @MainActor func testSelectionAndTargetedReloadSynchronizePlaceholderOccurrences() throws {
         let view = try make(.multiple)

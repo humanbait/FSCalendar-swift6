@@ -19,6 +19,8 @@ The rewrite preserves shared capabilities while making the following deliberate 
 
 `FSCalendar` and its UIKit callbacks are main-actor isolated. Content providers remain synchronous. Applications own asynchronous loading and call targeted reloads after updating their data.
 
+Row heights default to 44 points and honor smaller configured `rowHeight` values down to the font-dependent minimum (`titleFont.lineHeight + subtitleFont.lineHeight + 2` in UIKit, `titleFont.pointSize + subtitleFont.pointSize + 9` in AppKit). `FSCalendarAppearance.selectionVerticalInset` defaults to `nil` (retaining the legacy 5/6 selection circle sizing); setting an explicit non-negative inset (such as `0`) centers text and sizes the selection circle to `min(cellWidth, cellHeight - 2 * inset)` across week and continuous-month modes so adjacent selected week rows can sit flush with zero vertical gap.
+
 ## Continuous months
 
 `.continuousMonths` presents one uninterrupted grid of civil weeks in UIKit and AppKit.
